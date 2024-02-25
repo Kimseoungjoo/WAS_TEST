@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>SMWAS API PAGE</title>
+<link rel="stylesheet" th:href="@{/css/apiPage.css}">
+</head>
+<body>
+</head>
+
+<body>
+	<div id="loading">
+		<div class="state-viewer-container">
+				<div class="spinner"></div>
+			<label class="label-font" id="stateLabel">데이터 로딩 중 입니다.</label>
+		</div>
+	</div>
+	<div id="title">한국투자증권 API 조회</div>
+	<div class="container">
+		<form id="checkboxForm">
+			<div class="leftSection">
+				<div id="jmListTitle">조회 상위 종목</div>
+				<div class="selectAll">
+					<input type="checkbox" name="selectAll">전체선택/해제
+				</div>
+				<!-- onclick="selectAll(this)" -->
+				<div id="jmList"></div>
+			</div>
+		</form>
+
+		<div class="rightSection">
+			<form id="apiForm">
+				<!-- API 종류 선택 -->
+				<div id="select">
+					<select id="apiSelect" name="apiSelect">
+						<option value="">API를 선택하세요</option>
+						<option value="ccnl">주식현재가 체결</option>
+						<option value="dailyPrice">주식현재가 일자별</option>
+						<option value="askingPriceExpCcn">주식현재가 호가/예상 체결</option>
+						<option value="timeItemconclusion">주식현재가 당일 시간대별 체결</option>
+						<option value="investor">주식현재가 투자자</option>
+						<option value="member">주식현재가 회원사</option>
+						<option value="price">주식현재가 시세</option>
+						<option value="dailyItemchartprice">국내주식 기간별 시세(일/주/월/년)</option>
+						<option value="dailyIndexchartprice">국내주식 업종 기간별
+							시세(일/주/월/년)</option>
+					</select>
+
+					<button type="submit" id="submitBtn">조회</button>
+					<button type="button" id="rushTest">실시간 체결가 조회</button>
+					<button type="button" id="rushTest_2">실시간 호가 조회</button>
+					<button type="button" id="rushTestEnd">웹소켓 끊기</button>
+				</div>
+				<div id=queryParams>
+					<div id="inputTitle">Query Params</div>
+
+					<table id="inputTable" border="1">
+						<tr>
+							<th class="keyColumn">Key</th>
+							<th class="valueColumn">Value</th>
+							<th class="descriptionColumn">Description</th>
+						</tr>
+					</table>
+
+					<div id="inputFields"></div>
+				</div>
+			</form>
+
+			<!-- 응답 값 리턴 -->
+			<div id="responseTitle">Response</div>
+			<div id="response"></div>
+		</div>
+	</div>
+	<script src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+	<script th:src="@{/js/apiPage.js}"></script>
+</body>
+</html>

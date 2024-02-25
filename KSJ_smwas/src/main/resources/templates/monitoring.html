@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>SMWAS Monitoring</title>
+<link rel="stylesheet" th:href="@{/css/monitoring.css}">
+</head>
+<body>
+
+	<div id="full-container">
+
+        <section>
+
+            <article>
+                <p class="title">CPU Chart</p>
+                <div class="info">
+                    <p>CPU: <span id="cpuInfo"> - </span> %</p>
+                </div>
+                <div id="cpuChart" class="chart"></div>
+            </article>
+
+            <article>
+                <p class="title">Memory Chart</p>
+                <div class="info">
+                    <p>Heap Size: <span id="heapSizeInfo"> - </span> B&emsp;|&emsp;Used Heap: <span id="usedHeapInfo"> - </span> B</p>
+                </div>
+                <div id="memoryChart" class="chart"></div>
+            </article>
+
+        </section>
+
+        <section>
+
+            <article>
+                <p class="title">Disk Chart</p>
+                <div class="info">
+                    <p>Using: <span id="usingDiskInfo"> - </span> MB&emsp;|&emsp;Usable: <span id="usableDiskInfo"> - </span> MB</p>
+                </div>
+                <div id="diskChart" class="chart"></div>
+            </article>
+
+            <article id="session-container">
+                <p class="title">Session List</p>
+                <table>
+                    <tbody id="sessionList"></tbody>
+                </table>
+            </article>
+
+        </section>
+    </div>
+
+	<script src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+	<script th:src="@{/js/monitoring.js}"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+@charset "UTF-8";
+
+@font-face {
+    font-family: 'NanumSquareNeo-Variable';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_11-01@1.0/NanumSquareNeo-Variable.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+	font-family: 'NanumSquareNeo-Variable';
+}
+
+.chart {
+    width: 500px;
+    height: 300px;
+}
+
+#full-container {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+}
+
+section {
+    display: flex;
+    flex-direction: column;
+}
+
+#session-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; 
+    text-align: center;
+    width: 500px;
+    height: 350px;
+}
+
+.title {
+    font-size: 17px;
+    font-weight: 900;
+    margin-top: 10px;
+    margin-left: 10px;
+    color: #222;
+}
+
+.info {
+    font-size: 13px;
+    text-align: right;
+    margin-right: 15px;
+}
+
+table {
+    margin: 0 auto;
+    margin-top: 30px;
+    border-collapse: collapse;
+    width: 400px;
+    height: 250px;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f2f2f2; /* 배경색 지정 */
+}
+
+th, td {
+    font-size: 13px;
+    
+}
+
+.status {
+    width: 40px;
+}
+
+.socket {
+    text-align: left;
+}
+
+.usable, .using {
+    width: 17px;
+    height: 17px;
+    border-radius: 50%; /* 동그란 원형을 만들기 위한 속성 */
+    vertical-align: middle;
+    margin-left: 27px;
+}
+
+.using {
+    background-color: #0822b4;
+}
+
+.usable {
+    background-color: #0ff3a0;
+}
+
+
+
