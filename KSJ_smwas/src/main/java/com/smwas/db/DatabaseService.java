@@ -1,6 +1,10 @@
 package com.smwas.db;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -15,8 +19,10 @@ import com.smwas.dbio.DailyPrice;
 import com.smwas.dbio.InquireAskPrice;
 import com.smwas.dbio.InquireCcnl;
 import com.smwas.dbio.InquireInvestor;
+import com.smwas.dbio.InquireItemChart;
 import com.smwas.dbio.InquireMember;
 import com.smwas.dbio.InquirePrice;
+import com.smwas.dbio.PK_chart;
 import com.smwas.dbio.PK_dailyIndex;
 import com.smwas.dbio.PK_dailyItem;
 import com.smwas.dbio.PK_dailyPrice;
@@ -29,6 +35,7 @@ import com.smwas.dbrepo.DailyPriceRepository;
 import com.smwas.dbrepo.InquireAskPriceRepository;
 import com.smwas.dbrepo.InquireCcnlRepository;
 import com.smwas.dbrepo.InquireInvestorRepository;
+import com.smwas.dbrepo.InquireItemChartRepository;
 import com.smwas.dbrepo.InquireMemberRepository;
 import com.smwas.dbrepo.InquirePriceRepository;
 import com.smwas.dbrepo.TimeItemRepository;
@@ -62,12 +69,15 @@ public class DatabaseService {
 	private DailyPriceRepository dailyPriceRepository;
 	@Autowired
 	private TimeItemRepository timeItemRepository;
+	@Autowired
+	private InquireItemChartRepository inquireChartRepository;
 
 	PK_inquire pk_inquire;
 	PK_dailyIndex pk_dailyIndex;
 	PK_dailyItem pk_dailyItem;
 	PK_dailyPrice pk_dailyPrice;
 	PK_time pk_time;
+	PK_chart pk_chart;
 
 	String mrktType = "";
 	String jmCode = "";
@@ -88,9 +98,9 @@ public class DatabaseService {
 	 */
 	@Transactional
 	public boolean saveDB(ResultTrData apiResult) throws JsonProcessingException {
-		
+
 		boolean flag = true;
-		
+
 		String url = CommonUtil.getUrlLastSegment(apiResult.getTrCode());
 		Map<String, Object> header = apiResult.getHeaders();
 		Map<String, Object> outrec = apiResult.getOutRecMap();
@@ -141,6 +151,19 @@ public class DatabaseService {
 			orgAdj = (String) header.get("FID_ORG_ADJ_PRC");
 			output1 = CommonUtil.objectToString((Object) outrec.get("output1"));
 			output2 = CommonUtil.objectToString((Object) outrec.get("output2"));
+			if (outrec.get("output2") instanceof List) {
+				for (Map<String, String> outputObj : (List<Map<String, String>>) outrec.get("output2")) {
+					String chartData = CommonUtil.objectToString(outputObj);
+					String stck_bsop_date = outputObj.get("stck_bsop_date");
+					InquireItemChart row10 = new InquireItemChart(jmCode, stck_bsop_date, chartData);
+					inquireChartRepository.save(row10);
+				}
+			} else {
+
+				InquireItemChart row10 = new InquireItemChart(jmCode, date1, output2);
+				inquireChartRepository.save(row10);
+			}
+
 			DailyItem row7 = new DailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj, output1, output2);
 			dailyItemRepository.save(row7);
 		}
@@ -163,7 +186,7 @@ public class DatabaseService {
 			break;
 		}
 		}
-		
+
 		return flag;
 
 	}
@@ -250,14 +273,38 @@ public class DatabaseService {
 			date2 = data.getObjCommInput().get("FID_INPUT_DATE_2");
 			periodCode = data.getObjCommInput().get("FID_PERIOD_DIV_CODE");
 			orgAdj = data.getObjCommInput().get("FID_ORG_ADJ_PRC");
-			pk_dailyItem = new PK_dailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj);
-
-			Optional<DailyItem> dto7 = dailyItemRepository.findById(pk_dailyItem);
-			if (dto7.isPresent()) {
-				response.put("output1", CommonUtil.stringToMap(dto7.get().getOutput1()));
-				response.put("output2", CommonUtil.stringToList(dto7.get().getOutput2()));
-			} else {
+			
+			List<String> dateRange = getDateRange(date1, date2);
+			List<Object> output2 = new ArrayList<>();
+			for (String date3 : dateRange) {
+	            pk_chart = new PK_chart(jmCode, date3);
+	            Optional<InquireItemChart> dto = inquireChartRepository.findById(pk_chart);
+	            try {
+	            	if(dto.isPresent()) {
+	            		output2.add(CommonUtil.objectToString(dto.get().getChartData()));
+	            	}
+				} catch (JsonProcessingException e) {
+					e.printStackTrace();
+				}
+	        }
+//			pk_dailyItem = new PK_dailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj);
+//
+//			Optional<DailyItem> dto7 = dailyItemRepository.findById(pk_dailyItem);
+//			if (dto7.isPresent()) {
+//				response.put("output1", CommonUtil.stringToMap(dto7.get().getOutput1()));
+//				response.put("output2", CommonUtil.stringToList(dto7.get().getOutput2()));
+//			} else {
+//				response = null;
+//			}
+			if (output2 == null || output2.isEmpty()) {
 				response = null;
+			} else {
+				try {
+					response.put("output1", CommonUtil.objecttoMap(output2.get(output2.size()-1)));
+				} catch (JsonProcessingException e) {
+					e.printStackTrace();
+				}
+				response.put("output2", output2);
 			}
 
 		}
@@ -404,8 +451,22 @@ public class DatabaseService {
 		}
 	}
 
-	
+	/**
+	 * 날짜 범위 내의 모든 날짜 가져오는 메소드
+	 * 
+	 * @param url
+	 */
+	private static List<String> getDateRange(String startDateStr, String endDateStr) {
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+		LocalDate startDate = LocalDate.parse(startDateStr, formatter);
+		LocalDate endDate = LocalDate.parse(endDateStr, formatter);
 
-	
+		List<String> dateRange = new ArrayList();
+		for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+			dateRange.add(date.format(formatter));
+		}
+
+		return dateRange;
+	}
 
 }
