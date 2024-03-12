@@ -3,6 +3,7 @@ package com.smwas.db;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.smwas.comm.CommApi;
 import com.smwas.dbio.DailyIndex;
 import com.smwas.dbio.DailyItem;
 import com.smwas.dbio.DailyPrice;
@@ -44,6 +46,7 @@ import com.smwas.io.SendTrData;
 import com.smwas.tr.ErrorFile;
 import com.smwas.tr.TranFile;
 import com.smwas.util.CommonUtil;
+import com.smwas.util.LOGCAT;
 
 /**
  * 실제 DB 상호작용 담당 하나의 서비스 단위 commit, rollback 되어야할 기능들 정의
@@ -72,6 +75,8 @@ public class DatabaseService {
 	@Autowired
 	private InquireItemChartRepository inquireChartRepository;
 
+	public static final String TAG = DatabaseService.class.getSimpleName();
+	
 	PK_inquire pk_inquire;
 	PK_dailyIndex pk_dailyIndex;
 	PK_dailyItem pk_dailyItem;
@@ -155,12 +160,18 @@ public class DatabaseService {
 				for (Map<String, String> outputObj : (List<Map<String, String>>) outrec.get("output2")) {
 					String chartData = CommonUtil.objectToString(outputObj);
 					String stck_bsop_date = outputObj.get("stck_bsop_date");
-					InquireItemChart row10 = new InquireItemChart(jmCode, stck_bsop_date, chartData);
-					inquireChartRepository.save(row10);
+					if(!outputObj.isEmpty()) {
+						InquireItemChart row10 = new InquireItemChart(jmCode, stck_bsop_date, chartData);
+						inquireChartRepository.save(row10);
+					}
+					// TODO:: 데이터 여부에 따라 처리 .
+//					else {
+//						InquireItemChart row10 = new InquireItemChart(jmCode, date1, output1);
+//						inquireChartRepository.save(row10);
+//					}
 				}
 			} else {
-
-				InquireItemChart row10 = new InquireItemChart(jmCode, date1, output2);
+				InquireItemChart row10 = new InquireItemChart(jmCode, date1, output1);
 				inquireChartRepository.save(row10);
 			}
 
@@ -275,38 +286,47 @@ public class DatabaseService {
 			orgAdj = data.getObjCommInput().get("FID_ORG_ADJ_PRC");
 			
 			List<String> dateRange = getDateRange(date1, date2);
+			LOGCAT.i(TAG,  jmCode + " : [Date Range] - "+dateRange.toString() );
 			List<Object> output2 = new ArrayList<>();
-			for (String date3 : dateRange) {
-	            pk_chart = new PK_chart(jmCode, date3);
-	            Optional<InquireItemChart> dto = inquireChartRepository.findById(pk_chart);
-	            try {
-	            	if(dto.isPresent()) {
-	            		output2.add(CommonUtil.objectToString(dto.get().getChartData()));
-	            	}
-				} catch (JsonProcessingException e) {
-					e.printStackTrace();
+			if(periodCode.equals("D")) {
+				if(dateRange.size() < 200) {
+					for (String date3 : dateRange) {
+						pk_chart = new PK_chart(jmCode, date3);
+						Optional<InquireItemChart> dto = inquireChartRepository.findById(pk_chart);
+						try {
+							if(dto.isPresent()) {
+								output2.add(CommonUtil.objectToString(dto.get().getChartData()));
+							}
+						} catch (JsonProcessingException e) {
+							LOGCAT.i(TAG, "[ERROR] - " +e.toString());
+						}
+					}
 				}
-	        }
-//			pk_dailyItem = new PK_dailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj);
-//
-//			Optional<DailyItem> dto7 = dailyItemRepository.findById(pk_dailyItem);
-//			if (dto7.isPresent()) {
-//				response.put("output1", CommonUtil.stringToMap(dto7.get().getOutput1()));
-//				response.put("output2", CommonUtil.stringToList(dto7.get().getOutput2()));
-//			} else {
-//				response = null;
-//			}
-			if (output2 == null || output2.isEmpty()) {
-				response = null;
-			} else {
-				try {
-					response.put("output1", CommonUtil.objecttoMap(output2.get(output2.size()-1)));
-				} catch (JsonProcessingException e) {
-					e.printStackTrace();
+				if (output2 == null || output2.isEmpty()) {
+					LOGCAT.i(TAG, "Output - 2 없음 ");
+					response = null;
+				} else {
+					try {
+						List<Object> reverseOutput = new ArrayList<>();
+						Collections.reverse(output2);
+						response.put("output1", CommonUtil.objecttoMap(output2.get(output2.size()-1)));
+					} catch (JsonProcessingException e) {
+						e.printStackTrace();
+					}
+					response.put("output2", output2);
 				}
-				response.put("output2", output2);
+				
+			}else{
+				pk_dailyItem = new PK_dailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj);
+				
+				Optional<DailyItem> dto7 = dailyItemRepository.findById(pk_dailyItem);
+				if (dto7.isPresent()) {
+					response.put("output1", CommonUtil.stringToMap(dto7.get().getOutput1()));
+					response.put("output2", CommonUtil.stringToList(dto7.get().getOutput2()));
+				} else {
+					response = null;
+				}
 			}
-
 		}
 		case TranFile.INQUIRE_DAILY_PRICE -> {
 			date1 = data.getObjCommInput().get("FID_INPUT_DATE_1");

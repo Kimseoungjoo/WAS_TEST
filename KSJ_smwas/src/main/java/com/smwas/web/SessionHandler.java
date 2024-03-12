@@ -11,6 +11,9 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
+import com.smwas.comm.CommApi;
+import com.smwas.session.SessionItem;
+import com.smwas.session.SessionManager;
 import com.smwas.util.LOGCAT;
 
 
@@ -53,9 +56,10 @@ public class SessionHandler {
 		LOGCAT.i(TAG, "# on Open # 세션값: " + session);
 		this.session = session;
 		this.sessionId = this.session.getId();
-		if (this.connectHandler != null) {							// 수신 메세지를 처리할 로직이 없더라도 웹소켓 연결이 유지되도록 처리
+		if(this.connectHandler != null) {							// 수신 메세지를 처리할 로직이 없더라도 웹소켓 연결이 유지되도록 처리
 	        this.connectHandler.handlerConnect(this.sessionId); 			
 	    }
+//		if(SessionManager.getInstance())
 	}
 	
 	
@@ -71,6 +75,7 @@ public class SessionHandler {
 		if (this.connectHandler != null) {							// 웹소켓 연결 값 'false'로 설정
 	        this.connectHandler.handlerConnect(null); 			
 	    }
+		SessionManager.getInstance().reConnect();
 	}
 	
 	
@@ -80,7 +85,8 @@ public class SessionHandler {
 	 */
 	@OnMessage
 	public void onMessage(String message) {
-	    if (this.messageHandler != null) {				 // 수신 메세지를 처리할 로직이 없더라도 웹소켓 연결이 유지되도록 처리
+	    if (this.messageHandler != null) {				 
+	    	// 수신 메세지를 처리할 로직이 없더라도 웹소켓 연결이 유지되도록 처리
 	        this.messageHandler.handlerMessage(message); 			
 	    }
 	}
@@ -108,7 +114,7 @@ public class SessionHandler {
      * @param message: 서버로 보내는 메세지
      */
     public void sendMessage(String message) {
-    	LOGCAT.i(TAG, "# sendMessage # [SEND]: " + message);
+//    	LOGCAT.i(TAG, "# sendMessage # [SEND]: " + message);
         this.session.getAsyncRemote().sendText(message);
     }
 

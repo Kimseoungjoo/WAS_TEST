@@ -54,6 +54,7 @@ public class ClientService {
 	 */
 
 	public boolean checkLogin(String id, String pw) {
+		LOGCAT.i(TAG, "로그인 시도 - [ ID : "+id+" PWD : "+pw +" ]");
 		return FIXED_ID.equals(id) && FIXED_PW.equals(pw);
 	}
 
@@ -137,7 +138,7 @@ public class ClientService {
 
 	public void removeClientFromMap(String clientIpAddress) {
 		clientMap.remove(clientIpAddress);
-		LOGCAT.i(TAG, "remove");
+//		LOGCAT.i(TAG, "remove");
 	}
 
 	/**

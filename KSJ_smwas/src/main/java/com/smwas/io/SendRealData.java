@@ -11,7 +11,7 @@ public class SendRealData {
 	private String mTrCode;
 //	private List<String> mJmList;
 	private String mRqName;	 // 1 : 등록 , 2 : 해제 
-	private Map<String, Object> mHeader; // header 값
+	private Map<String, String> mHeader; // header 값
 	private Map<String, Object> mObjCommInput; // body 값  tr_key : 종목 키 , tr_id : 호가 ( H0STASP0 ) / 체결(H0STCNT0) 
 
 	public String getTrCode() {
@@ -21,15 +21,7 @@ public class SendRealData {
 	public void setTrCode(String trCode) {
 		mTrCode = trCode;
 	}
-
-//	public List<String> getJmList() {
-//		return mJmList;
-//	}
-//
-//	public void setJmList(List<String> jmList) {
-//		mJmList = jmList;
-//	}
-
+	
 	public String getmRqName() {
 		return mRqName;
 	}
@@ -39,15 +31,15 @@ public class SendRealData {
 	}
 
 
-	public Map<String, Object> getmHeader() {
+	public Map<String, String> getHeader() {
 		return mHeader;
 	}
 
-	public void setHeader(Map<String, Object> header) {
+	public void setHeader(Map<String, String> header) {
 		this.mHeader = header;
 	}
 
-	public Map<String, Object> getmObjCommInput() {
+	public Map<String, Object> getObjCommInput() {
 		return mObjCommInput;
 	}
 
@@ -62,8 +54,8 @@ public class SendRealData {
 		try {
 			String strHeader;
 			String strObjInput;
-			 strHeader = objectmapper.writeValueAsString(getmHeader());
-			 strObjInput = objectmapper.writeValueAsString(getmObjCommInput());
+			 strHeader = objectmapper.writeValueAsString(getHeader());
+			 strObjInput = objectmapper.writeValueAsString(getObjCommInput());
 			 return "SendRealData [getTrCode()=" + getTrCode() + ", getrqName()=" + getmRqName()
 			 + ", getmHeader()=" + strHeader + ", getmObjCommInput()=" + strObjInput + "]";
 		} catch (Exception e) {

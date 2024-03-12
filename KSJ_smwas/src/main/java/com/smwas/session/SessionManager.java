@@ -1,6 +1,7 @@
 package com.smwas.session;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,7 +55,7 @@ public class SessionManager {
 			SessionItem item = mSessionList.get(0);
 			String key = item.getKey();
 			item.init(key);
-			item.connectToServer(key);
+			item.connectToServer(key,true);
 			LOGCAT.i(TAG, "통신 재연결");
 		}
 	}
@@ -74,7 +75,7 @@ public class SessionManager {
 
 			item.init(key);
 			// 통신 연결
-			item.connectToServer(key);
+			item.connectToServer(key,false);
 
 			// Session 리스트에 넣기
 			mSessionList.add(item);
@@ -233,38 +234,43 @@ public class SessionManager {
 	}
 
 	/**
-	 * monitoring 세션 리스트 조회
-	 * TODO :: 24.02.14 세션 ITEM 수정시 수정 필요 
+	 * monitoring 세션 리스트 조회 
+	 * 
 	 * @return
 	 */
-	public List<Map<String, String>> getSessionList() {
-		if (mSessionList.isEmpty()) {
-			return null;
-		}
+	public Map<String, Object> getSessionList() {
+		int connection = 0;
+		List<String> ipList = new ArrayList<>();
 
-		List<Map<String, String>> newSessionList = new ArrayList<>();
-		Map<String, String> map = new HashMap<>();
-		mSessionList.get(0).getKey();
-		for(WebSocketSession entry : mSessionList.get(0).getcSessionList()) {	
-			map.put("key", mSessionList.get(0).getKey());
-			map.put("webSocketId", entry.getId());
+		if (!mSessionList.isEmpty()) {
+			connection = 1;
+			SessionItem item = getSessionItem();
+			List<WebSocketSession> cSessionList = item.getcSessionList();
+			for (WebSocketSession wsItem : cSessionList) {
+				InetSocketAddress remoteAddress = (InetSocketAddress) wsItem.getRemoteAddress();
+				String ipAddress = remoteAddress.getHostString(); // IP 주소 추출
+				ipList.add(ipAddress);
+			}
+
 		}
-		return newSessionList;
+		Map<String, Object> result = new HashMap<>();
+		result.put("connection", connection);
+		result.put("ipList", ipList);
+
+		return result;
 	}
 	/**
 	 * Session list 목록 to string
 	 *  
 	 */
 	public String getSessionString() {
-		String sessionListStr = "";
 		if (mSessionList.isEmpty()) {
 			return null;
 		}
-		for(WebSocketSession entry : mSessionList.get(0).getcSessionList()) {
-			sessionListStr +=  entry.getId()+ ", ";
-		}
+		LOGCAT.i(TAG, mSessionList.get(0).toString());
 		
-		return sessionListStr;
+		
+		return mSessionList.get(0).toString();
 	}
 	
 	

@@ -1,3 +1,6 @@
+
+
+
 package com.smwas.http;
 
 import java.io.IOException;
@@ -28,6 +31,7 @@ import com.smwas.db.RushTestService;
 import com.smwas.dbio.RealtimeChe;
 import com.smwas.dbio.RealtimeHo;
 import com.smwas.io.ResultTrData;
+import com.smwas.io.SendRealData;
 import com.smwas.io.SendTrData;
 import com.smwas.monitoring.MonitoringService;
 import com.smwas.session.SessionItem;
@@ -144,7 +148,7 @@ public class WasRestController {
 		double totalDisk = monitoringService.getDiskTotalSpace();
 		double usableDisk = monitoringService.getDiskUsableSpace();
 		double usingDisk = totalDisk - usableDisk;
-		List<Map<String, String>> sessionList = SessionManager.getInstance().getSessionList();
+		Map<String, Object> sessionIPList = SessionManager.getInstance().getSessionList();
 
 		ModelMap map = new ModelMap();
 		map.addAttribute("cpu", cpu);
@@ -152,7 +156,7 @@ public class WasRestController {
 		map.addAttribute("usedMemory", usedMemory);
 		map.addAttribute("usingDisk", usingDisk);
 		map.addAttribute("usableDisk", usableDisk);
-		map.addAttribute("sessionList", sessionList);
+		map.addAttribute("sessionList", sessionIPList);
 		return map;
 	}
 
@@ -170,16 +174,16 @@ public class WasRestController {
 			throws IOException {
 
 		String clientIp = request.getRemoteAddr(); // 요청한 IP 가져오기
-		LOGCAT.i(TAG, "[REQUEST] [요청IP:" + clientIp + "]" + "\n" + sendData);
+		LOGCAT.i(TAG, "[REQUEST] [요청IP:" + clientIp + "] "+ sendData);
 
 		try {
 			ObjectMapper mapper = new ObjectMapper();
 			SendTrData data = mapper.readValue(sendData, SendTrData.class);
-
+			
 			// Input 검증
 			Map<String, Object> inputCheckResult = CommApi.checkRequest(data);
 			boolean flag = (boolean) inputCheckResult.get("flag");
-
+			LOGCAT.i(TAG, "[REQUEST] [Data" + data.toString() + "]" + "\n" + sendData);
 			if (flag) { // input 검증 완료
 				// DB 조회
 				ResultTrData dbResult = databaseService.selectDB(data);
@@ -189,6 +193,7 @@ public class WasRestController {
 				if (dbResult.getOutRecMap().get("msg_cd").equals("EGW00101")) {
 					// 한투 API 요청
 					ResultTrData apiResult = CommApi.getInstance().callApiForDB(data);
+					LOGCAT.i(TAG, apiResult.toString());
 					String msg_cd = (String) apiResult.getOutRecMap().get("msg_cd");
 
 					// 요청 결과 DB 저장
@@ -279,21 +284,43 @@ public class WasRestController {
 	public ResponseEntity<String> RealRequest(@RequestBody String sendWsData) {
 		try {
 			ObjectMapper mapper = new ObjectMapper();
-			SendTrData wsData = mapper.readValue(sendWsData, SendTrData.class);
-			ResultTrData checkMsg = CommApi.getInstance().checkData(wsData);
-			// data 여부 
-			if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
-				if (CommApi.getInstance().callRealAPI(wsData)) {
-					return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
-				} else {
-					LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
-					return ResponseEntity.status(400).body(sendWsData);
+			SendRealData wsData = mapper.readValue(sendWsData, SendRealData.class);
+			LOGCAT.i(TAG, wsData.toString());
+			if(wsData.getObjCommInput().get("tr_key") instanceof List) {
+				List<String> trKeyList = (List<String>) wsData.getObjCommInput().get("tr_key");
+				for (String key : trKeyList) {
+					ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,key);
+					// data 여부 
+					if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
+						if (CommApi.getInstance().callRealAPI(wsData,key)) {
+							return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
+						} else {
+							LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
+							return ResponseEntity.status(400).body(sendWsData);
+						}
+					}else {
+						String result = mapper.writeValueAsString(checkMsg);
+						return ResponseEntity.status(400).body(result);
+					}
 				}
+				
 			}else {
-				String result = mapper.writeValueAsString(checkMsg);
-				return ResponseEntity.status(400).body(result);
+				String trkey = (String) wsData.getObjCommInput().get("tr_key");
+				ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,trkey);
+				// data 여부 
+				if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
+					if (CommApi.getInstance().callRealAPI(wsData,trkey)) {
+						return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
+					} else {
+						LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
+						return ResponseEntity.status(400).body(sendWsData);
+					}
+				}else {
+					String result = mapper.writeValueAsString(checkMsg);
+					return ResponseEntity.status(400).body(result);
+				}
 			}
-
+			return null;
 		} catch (Exception e) {
 			LOGCAT.printStackTrace(e);
 			return ResponseEntity.status(400).body(e.toString());
@@ -314,32 +341,38 @@ public class WasRestController {
 			ObjectMapper mapper = new ObjectMapper();
 			SendTrData wsData = mapper.readValue(sendWsData, SendTrData.class);
 
-			String trCode = wsData.getObjCommInput().get("tr_id");
+			String trCode = (String) wsData.getObjCommInput().get("tr_id");
 			String trType = wsData.getHeader().get("tr_type");
 			String websocketId = wsData.getHeader().get("sessionKey");
-
+			LOGCAT.i(TAG, "TR_ID : " + trCode );
 			List<RealtimeChe> cheList = new ArrayList<>();
 			List<RealtimeHo> hoList = new ArrayList<>();
-			LOGCAT.i(TAG, "DATA - [ " + cheList.toString() + " ] + [ " + hoList.toString() + " ]");
 			// DB 조회
-			switch (trCode) {
-			case TranFile.REAL_CHE -> cheList = rushtestService.selectAllDbChe();
-			case TranFile.REAL_HO -> hoList = rushtestService.selectAllDbHo();
-			default -> {
-				break;
-			}
-			}
+//			switch (trCode) {
+//				case TranFile.REAL_CHE :
+					cheList = rushtestService.selectAllDbChe();
+					LOGCAT.i(TAG, "체결 : " + cheList.size());
+//				case TranFile.REAL_HO :
+					hoList = rushtestService.selectAllDbHo();
+					LOGCAT.i(TAG, "호가 : " + hoList.size());
+//				default :
+//					
+//					break;
+//			}
 
 			// 소켓으로 전송
 			SessionItem item = SessionManager.getInstance().getPubSessionItem(websocketId);
 			LOGCAT.i(TAG, "Rush item - " + Boolean.toString(item.isRushConnected()) + "  ID - " + item.getCrushList().get(websocketId));
 			if (!item.isRushConnected() || item.getCrushList().get(websocketId).equals("true")) {
 				if (trType.equals("1")) {
+					LOGCAT.i(TAG, "test-1 che : " + cheList.size());
 					item.startSendingRush(cheList, hoList, websocketId);
 				} else {
+					LOGCAT.i(TAG, "test-2");
 					item.stopSendingRush(websocketId);
 				}
 			} else {
+				LOGCAT.i(TAG, "test-3");
 				String ip = item.getUseRush();
 				if( ip != null) {
 					return ResponseEntity.status(400).body("RushTest( "+ip+" )를 이미 진행중입니다.");
@@ -350,6 +383,7 @@ public class WasRestController {
 		} catch (JsonProcessingException e) {
 			// TODO Auto-generated catch block
 			LOGCAT.printStackTrace(e);
+			LOGCAT.i(TAG, e.toString());
 			return ResponseEntity.status(400).body(e.toString());
 		}
 

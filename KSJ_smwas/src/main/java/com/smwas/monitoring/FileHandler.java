@@ -21,16 +21,16 @@ import com.smwas.util.LOGCATCollector;
 public class FileHandler {
 	public static final String TAG = FileHandler.class.getSimpleName();
 	
-	public static final List<String> REALTAG = new ArrayList<>(Arrays.asList("SessionItem","SessionManager"));
+	public static final List<String> REALTAG = new ArrayList<>(Arrays.asList("test"));
 	
 	private static final String LOG_DIR = "/home/smwas/test/log";						// 일반 로그 파일 저장 경로(서버)
+//	private static final String LOG_DIR = "C:\\work\\smwas\\logs"; // 일반 로그 파일 저장 경로(테스트)
 //	private static final int MAX_SAVE_DAY = 7; 											// 최대 파일 보관 기한
 	private static final int MAX_FILE_SIZE = 1024 * 1024 * 300; 						// 최대 파일 사이즈(300MB)
 	private static final String LOG_BASIC_NAME = "smwas_log_"; // 일반 로그 파일명 양식
 	private static final String PLOG_BASIC_NAME = "smwas_polling_log_"; // 폴링 로그 파일명 양식
 
 	// 테스트
-//	private static final String LOG_DIR = "C:\\work\\smwas\\logs"; // 일반 로그 파일 저장 경로(테스트)
 	private static final int MAX_SAVE_DAY = 1; // 최대 파일 보관 기한
 //	private static final int MAX_FILE_SIZE = 1024; // 최대 파일 사이즈(1KB)
 

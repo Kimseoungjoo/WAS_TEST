@@ -34,6 +34,7 @@ import com.smwas.header.CommHeader;
 import com.smwas.http.Auth;
 import com.smwas.io.RQRPData;
 import com.smwas.io.ResultTrData;
+import com.smwas.io.SendRealData;
 import com.smwas.io.SendTrData;
 import com.smwas.session.SessionItem;
 import com.smwas.session.SessionManager;
@@ -99,119 +100,124 @@ public class CommApi {
 	 * @return
 	 */
 	public static Map<String, Object> checkRequest(SendTrData data) {
-		
+
 		boolean flag = true;
-		if(TranFile.getInstance().getTrId(data.getTrCode()) != null) {
+		if (TranFile.getInstance().getTrId(data.getTrCode()) != null) {
 			String url = CommonUtil.getUrlLastSegment(data.getTrCode());
 			Map<String, String> inputValueMap = data.getObjCommInput();
-			
-			for (Map.Entry<String, String> entry : inputValueMap.entrySet()) {
-				String key = entry.getKey();
-				String value = entry.getValue();
+			LOGCAT.i(TAG, "[checkRequest] - " + url + " :: "+ inputValueMap.toString());
+			if( !(data.getObjCommInput() == null || data.getObjCommInput().isEmpty()) ) {
 				
-				
-				// 자릿수 체크 & 대문자 변환 
-				switch (key) {
-				case "FID_COND_MRKT_DIV_CODE" -> {		// J, U
-					if (value.length() != 1) {
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
-					} else {
-						value = value.toUpperCase();	// 대문자 변환
-						if (!value.equals("J") && !value.equals("U")) {
-							LOGCAT.i(TAG, key + "가 J, U가 아님");
+				for (Map.Entry<String, String> entry : inputValueMap.entrySet()) {
+					String key = entry.getKey();
+					String value = entry.getValue();
+					
+					// 자릿수 체크 & 대문자 변환
+					switch (key) {
+					case "FID_COND_MRKT_DIV_CODE" -> { // J, U
+						if (value.length() != 1) {
 							flag = false;
+							LOGCAT.i(TAG, key + " 길이 다름");
 						} else {
-							inputValueMap.put(key, value);
+							value = value.toUpperCase(); // 대문자 변환
+							if (!value.equals("J") && !value.equals("U")) {
+								LOGCAT.i(TAG, key + "가 J, U가 아님");
+								flag = false;
+							} else {
+								inputValueMap.put(key, value);
+							}
 						}
 					}
-				}
-				case "FID_INPUT_ISCD" -> {				// 005930
-					if (value.length() > 6) {			// 0001(KODEX200), 201(KOSDAQ - KEPCO)
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
-					}
-				}
-				case "FID_INPUT_DATE_1", "FID_INPUT_DATE_2" -> {	// 20220420, 20220430
-					if (value.length() != 8) {
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
-					}
-				}
-				case "FID_PERIOD_DIV_CODE" -> {			// D, W, M
-					if (value.length() != 1) {
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
-					} else {
-						value = value.toUpperCase();	// 대문자 변환
-						if (!value.equals("D") && !value.equals("W") && !value.equals("M")) {
+					case "FID_INPUT_ISCD" -> { // 005930
+						if (value.length() > 6) { // 0001(KODEX200), 201(KOSDAQ - KEPCO)
 							flag = false;
-							LOGCAT.i(TAG, key + "가 D, W, M이 아님");
+							LOGCAT.i(TAG, key + " 길이 다름");
+						}
+					}
+					case "FID_INPUT_DATE_1", "FID_INPUT_DATE_2" -> { // 20220420, 20220430
+						if (value.length() != 8) {
+							flag = false;
+							LOGCAT.i(TAG, key + " 길이 다름");
+						}
+					}
+					case "FID_PERIOD_DIV_CODE" -> { // D, W, M
+						if (value.length() != 1) {
+							flag = false;
+							LOGCAT.i(TAG, key + " 길이 다름");
 						} else {
-							inputValueMap.put(key, value);
+							value = value.toUpperCase(); // 대문자 변환
+							if (!value.equals("D") && !value.equals("W") && !value.equals("M")) {
+								flag = false;
+								LOGCAT.i(TAG, key + "가 D, W, M이 아님");
+							} else {
+								inputValueMap.put(key, value);
+							}
 						}
 					}
-				}
-				case "FID_ORG_ADJ_PRC" -> {				// 0, 1
-					if (value.length() != 1) {
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
-					} else {
-						if (!value.equals("0") && !value.equals("1")) {
+					case "FID_ORG_ADJ_PRC" -> { // 0, 1
+						if (value.length() != 1) {
 							flag = false;
-							LOGCAT.i(TAG, key + "가 0, 1이 아님");
+							LOGCAT.i(TAG, key + " 길이 다름");
+						} else {
+							if (!value.equals("0") && !value.equals("1")) {
+								flag = false;
+								LOGCAT.i(TAG, key + "가 0, 1이 아님");
+							}
 						}
 					}
-				}
-				case "FID_INPUT_HOUR_1" -> {			// HHMMSS
-					if (value.length() != 6) {
-						flag = false;
-						LOGCAT.i(TAG, key + " 길이 다름");
+					case "FID_INPUT_HOUR_1" -> { // HHMMSS
+						if (value.length() != 6) {
+							flag = false;
+							LOGCAT.i(TAG, key + " 길이 다름");
+						}
 					}
-				}
-				default -> {
+					default -> {
 //				flag = false;
-					break;
-				}
-				}
-			}
-			
-			// 날짜? 기간 선후관계 체크
-			if (url.equals(TranFile.INQUIRE_DAILY_INDEX) || url.equals(TranFile.INQUIRE_DAILY_ITEM)) {
-				String date1 = inputValueMap.get("FID_INPUT_DATE_1");	// 과거여야함
-				String date2 = inputValueMap.get("FID_INPUT_DATE_2");	// 미래여야함
-				if (date1.length() == 8 && date2.length() == 8) {
-					try {
-						// 주어진 날짜 문자열을 LocalDate 객체로 변환
-						LocalDate localDate1 = LocalDate.parse(date1, java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
-						LocalDate localDate2 = LocalDate.parse(date2, java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
-						
-						// 날짜 비교
-						int comparisonResult = localDate1.compareTo(localDate2);
-						
-						// 양수(미래, 과거), 0(동일), 음수(과거, 미래)
-						if (comparisonResult > 0) {
-							flag = false;
-							LOGCAT.i(TAG, "날짜 선후관계가 맞지 않음");
-						}
-					} catch (Exception e) {
-						flag = false;
-						LOGCAT.printStackTrace(e);
-						LOGCAT.i(TAG, "날짜 데이터 오류");
+						break;
+					}
 					}
 				}
+				// 날짜? 기간 선후관계 체크
+				if (url.equals(TranFile.INQUIRE_DAILY_INDEX) || url.equals(TranFile.INQUIRE_DAILY_ITEM)) {
+					String date1 = inputValueMap.get("FID_INPUT_DATE_1"); // 과거여야함
+					String date2 = inputValueMap.get("FID_INPUT_DATE_2"); // 미래여야함
+					if (date1.length() == 8 && date2.length() == 8) {
+						try {
+							// 주어진 날짜 문자열을 LocalDate 객체로 변환
+							LocalDate localDate1 = LocalDate.parse(date1,
+									java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+							LocalDate localDate2 = LocalDate.parse(date2,
+									java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+							
+							// 날짜 비교
+							int comparisonResult = localDate1.compareTo(localDate2);
+							
+							// 양수(미래, 과거), 0(동일), 음수(과거, 미래)
+							if (comparisonResult > 0) {
+								flag = false;
+								LOGCAT.i(TAG, "날짜 선후관계가 맞지 않음");
+							}
+						} catch (Exception e) {
+							flag = false;
+							LOGCAT.printStackTrace(e);
+							LOGCAT.i(TAG, "날짜 데이터 오류");
+						}
+					}
+				}
+			}else {
+				flag = false;
 			}
-			
+
+
 		}
-		
+
 		Map<String, Object> checkingResult = new HashMap<>();
 		checkingResult.put("flag", flag);
 		checkingResult.put("data", data);
-		
+
 		return checkingResult;
 	}
-	
-	
+
 	/**
 	 * DB Insert 위해 한투 API 조회
 	 * 
@@ -289,7 +295,7 @@ public class CommApi {
 							if (data.getTrCode().contains(TranFile.INQUIRE_ASK_PRICE_EXP)) {
 								Map<String, String> test = (Map<String, String>) outlec.get("output1");
 								if (test.get("aspr_acpt_hour").equals("000000")) {
-									dataFlag = false;
+									dataFlag = true; // TODO :: 추후에 변경이 필요할 수 있음. 현재 잘못된 응답값 정상으로 보냄 dataFlag = false;
 								} else {
 									dataFlag = true;
 								}
@@ -498,77 +504,127 @@ public class CommApi {
 
 	/*-------------------------------------------(실시간 api 요청 START)-----------------------------------------------------*/
 
-	
 	/**
 	 * 한투 Server 로 실시간 데이터 요청
 	 * 
 	 * @param data
 	 * @return
 	 */
-	public boolean callRealAPI(SendTrData data) {
+	public boolean callRealAPI(SendRealData data, String trkey) {
 
 		boolean realFlag = false; // real 통신 flag
 		new HashMap<>();
-		LOGCAT.i(TAG + " - REAL REQUEST", data.toString());
 
 		String sessionId = data.getHeader().get("sessionKey");
 		boolean addFlag = false;
 		boolean removeFlag = false;
 
+		LOGCAT.i(TAG, "REAL REQUEST  - [ " + data.toString() + " ] sessionKey - [ " + sessionId + " ]");
 		if (sessionId != null) {
 			// 0. SessionId를 통해 sessionItem 가져오기
 			SessionItem item = SessionManager.getInstance().getPubSessionItem(sessionId);
 			WebSocketSession getSession = item.getWebsocket(sessionId);
-			LOGCAT.i(TAG, "Session List - [ " + SessionManager.getInstance().getSessionString() + " ]");
-			if(item.isSvrConnected()) {
-				
-				if (getSession != null && item.getKey() != null ) {
+			LOGCAT.i(TAG, "Session List - [ " + SessionManager.getInstance().getSessionString() + " ] ("
+					+ Boolean.toString(item.isSvrConnected()) + ")");
+			if (item.isSvrConnected()) {
+				LOGCAT.i(TAG, "test - 1");
+				if (item.getKey() != null) {
 					// C -W 연결 Session
-					
-					String tr_id = data.getObjCommInput().get("tr_id");				// 호가, 체결 구분 변수
-					String tr_key = data.getObjCommInput().get("tr_key");			// 종목 코드 값 
-					// 종목을 등록하는 경우
-					if (data.getHeader().get("tr_type").equals("1")) {
-						LOGCAT.i(TAG, "Session add Data - [ ID : " + getSession.getId() + " JMCODE : "
-								+ tr_key + " ]");
-						addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
-					} else {
-						LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : "
-								+ tr_key + " ]");
-						if(item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
-							if(item.getAllJmCodeList().get(tr_id) != null && item.getJmCode(sessionId).get(tr_id) != null ) {
-								item.getJmCode(sessionId).get(tr_id).remove(tr_key);
-								item.getAllJmCodeList().get(tr_id).remove(tr_key);
-								removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
+					LOGCAT.i(TAG, "test - 2");
+					String tr_id = (String) data.getObjCommInput().get("tr_id"); // 호가, 체결 구분 변수
+					String tr_key = trkey; // 종목 코드 값
+					if (data.getObjCommInput().get("tr_key") instanceof List) {
+						List<String> trKeyList = (List<String>) data.getObjCommInput().get("tr_key");
+						for (String key : trKeyList) {
+							tr_key = key;
+							// 종목을 등록하는 경우
+							if (data.getHeader().get("tr_type").equals("1")) {
+								LOGCAT.i(TAG, "test - 3");
+								LOGCAT.i(TAG, "Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key
+										+ " ]");
+								addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
+							} else {
+								LOGCAT.i(TAG, "test - 4");
+								LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : "
+										+ tr_key + " ]");
+								if (item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
+									if (item.getAllJmCodeList().get(tr_id) != null
+											&& item.getJmCode(sessionId).get(tr_id) != null) {
+										item.getJmCode(sessionId).get(tr_id).remove(tr_key);
+										item.getAllJmCodeList().get(tr_id).remove(tr_key);
+
+										removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
+										LOGCAT.i(TAG, "[ " + tr_key + " ] 통신 해제 ");
+									}
+								}
+							}
+							Map<String, Object> rqData = new HashMap<String, Object>();
+
+							if (createRealHeader(data) != null && data.getObjCommInput() != null) {
+								rqData.put("header", createRealHeader(data));
+								Map<String, Object> input = new HashMap<String, Object>();
+								input.put("input", data.getObjCommInput());
+								rqData.put("body", input);
+							}
+							if (rqData != null) {
+								// RushTest 를 위한 코드 수정
+								if (addFlag || removeFlag) {
+									item.sendRealRq(rqData, sessionId);
+								}
+								realFlag = true;
+								return realFlag;
 							}
 						}
-					}
-					Map<String, Object> rqData = new HashMap<String, Object>();
-					
-					if (createRealHeader(data) != null && data.getObjCommInput() != null) {
-						rqData.put("header", createRealHeader(data));
-						Map<String, Object> input = new HashMap<String, Object>();
-						input.put("input", data.getObjCommInput());
-						rqData.put("body", input);
-					}
-					if (rqData != null) {
-						// RushTest 를 위한 코드 수정
-						if (addFlag || removeFlag) {
-							item.sendRealRq(rqData, sessionId);
+					} else {
+						tr_key = (String) data.getObjCommInput().get("tr_key");
+						// 종목을 등록하는 경우
+						if (data.getHeader().get("tr_type").equals("1")) {
+							LOGCAT.i(TAG, "test - 5");
+							LOGCAT.i(TAG,"Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key + " ]");
+							addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
+						} else {
+							LOGCAT.i(TAG, "test - 6");
+							LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key
+									+ " ]");
+							if (item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
+								if (item.getAllJmCodeList().get(tr_id) != null
+										&& item.getJmCode(sessionId).get(tr_id) != null) {
+									item.getJmCode(sessionId).get(tr_id).remove(tr_key);
+									item.getAllJmCodeList().get(tr_id).remove(tr_key);
+
+									removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
+									LOGCAT.i(TAG, "[ " + tr_key + " ] 통신 해제 ");
+								}
+							}
 						}
-						realFlag = true;
-						return realFlag;
+						Map<String, Object> rqData = new HashMap<String, Object>();
+
+						if (createRealHeader(data) != null && data.getObjCommInput() != null) {
+							rqData.put("header", createRealHeader(data));
+							Map<String, Object> input = new HashMap<String, Object>();
+							data.getObjCommInput().put("tr_key", tr_key);
+							input.put("input", data.getObjCommInput());
+							rqData.put("body", input);
+						}
+						if (rqData != null) {
+							// RushTest 를 위한 코드 수정
+							if (addFlag || removeFlag) {
+								item.sendRealRq(rqData, sessionId);
+							}
+							realFlag = true;
+							return realFlag;
+						}
 					}
 				}
-			}else {
-				// 서버 연결 끊어졌을 경우 
+			} else {
+				LOGCAT.i(TAG, "test - 5");
+				// 서버 연결 끊어졌을 경우
 				SessionManager.getInstance().reConnect();
+				callRealAPI(data,trkey);
 			}
-			return realFlag;
 		}
 		return realFlag;
 	}
-	
 
 	/**
 	 * 리얼 헤더 생성
@@ -576,7 +632,7 @@ public class CommApi {
 	 * @param data
 	 * @return
 	 */
-	public static Map<String, String> createRealHeader(SendTrData data) {
+	public static Map<String, String> createRealHeader(SendRealData data) {
 		Map<String, String> realHeader = new HashMap<String, String>();
 
 		// data 없으면 return
@@ -592,7 +648,6 @@ public class CommApi {
 		}
 	}
 
-	
 	/**
 	 * 리얼 해제 헤더 생성
 	 * 
@@ -600,7 +655,7 @@ public class CommApi {
 	 * @param jmCode
 	 * @return
 	 */
-	
+
 	public Map<String, Object> createCancelReal(String jmType, String jmCode) {
 		Map<String, Object> rqData = new HashMap<String, Object>();
 		Map<String, String> realHeader = new HashMap<String, String>();
@@ -624,7 +679,6 @@ public class CommApi {
 		return rqData;
 	}
 
-	
 	/**
 	 * 웹소켓 헤더 설정
 	 * 
@@ -647,7 +701,6 @@ public class CommApi {
 		return wsHeader;
 	}
 
-	
 	/**
 	 * 웹소켓 바디 설정
 	 * 
@@ -674,26 +727,26 @@ public class CommApi {
 		return jsonBody;
 	}
 
-	
 	/**
-	 * data 확인 코드 
+	 * data 확인 코드
 	 * 
 	 * @return boolean
 	 */
-	public ResultTrData checkData(SendTrData checkData) {
-		Map<String, Object>  response = new HashMap<>(); // response가 null이면 새 HashMap을 생성
-		// data 없을 경우 
-		if(checkData != null){
-			if(checkData.getObjCommInput().get("tr_key") == null || checkData.getObjCommInput().get("tr_key").isEmpty()) {
+	public ResultTrData checkData(SendRealData checkData, String trkey) {
+		Map<String, Object> response = new HashMap<>(); // response가 null이면 새 HashMap을 생성
+		// data 없을 경우
+		if (checkData != null) {
+			if (trkey == null
+					|| trkey.isEmpty()) {
 				response.put("msg_cd", "OPSP9990");
 				response.put("msg1", ErrorFile.getInstance().getErrorMsg("OPSP9990"));
 				response.put("rt_cd", "1");
-			}else {
+			} else {
 				response.put("msg_cd", "MCA00000");
 				response.put("msg1", ErrorFile.getInstance().getErrorMsg("MCA00000"));
 				response.put("rt_cd", "1");
 			}
-		}else {
+		} else {
 			// Input data not found
 			response.put("msg_cd", "OPSP9991");
 			response.put("msg1", ErrorFile.getInstance().getErrorMsg("OPSP9991"));
@@ -702,6 +755,5 @@ public class CommApi {
 		ResultTrData resultData = new ResultTrData(checkData.getTrCode(), null, null, response, false);
 		return resultData;
 	}
-	
 
 }

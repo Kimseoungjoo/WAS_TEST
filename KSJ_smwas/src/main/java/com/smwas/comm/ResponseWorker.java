@@ -6,6 +6,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smwas.io.ResultTrData;
+import com.smwas.util.LOGCAT;
 
 /**
  * 통신 응답 Thread
@@ -29,6 +30,7 @@ public class ResponseWorker extends Thread {
 			String[] recvvalue = data.split("\\^");
 			new HashMap<String,String>();
 			realResultData.setTrCode(trCode);
+//			LOGCAT.i("ResponseWorker", "실시간 응답 코드 : " + trCode);
 			
 			if(trCode.equals("H0STASP0") ) {
 				realResultData.getOutRecMap().put("MKSC_SHRN_ISCD", recvvalue[0]); 			//	유가증권 단축 종목코드
@@ -96,6 +98,7 @@ public class ResponseWorker extends Thread {
 				realResultData.getOutRecMap().put("STCK_DEAL_CLS_CODE",recvvalue[58]);		// 주식매매 구분코드
 				realResultData.getOutRecMap().put("type", "realData");
 			}else {
+				
 				//"유가증권단축종목코드|주식체결시간|주식현재가|전일대비부호|전일대비|전일대비율|가중평균주식가격|주식시가|주식최고가|주식최저가|매도호가1|매수호가1|체결거래량|누적거래량|누적거래대금|매도체결건수|매수체결건수|순매수체결건수|체결강도|총매도수량|총매수수량|체결구분|매수비율|전일거래량대비등락율|시가시간|시가대비구분|시가대비|최고가시간|고가대비구분|고가대비|최저가시간|저가대비구분|저가대비|영업일자|신장운영구분코드|거래정지여부|매도호가잔량|매수호가잔량|총매도호가잔량|총매수호가잔량|거래량회전율|전일동시간누적거래량|전일동시간누적거래량비율|시간구분코드|임의종료구분코드|정적VI발동기준가";
 				String menulistJ = "MKSC_SHRN_ISCD|STCK_CNTG_HOUR|STCK_PRPR|PRDY_VRSS_SIGN|PRDY_VRSS|PRDY_CTRT|WGHN_AVRG_STCK_PRC|STCK_OPRC|STCK_HGPR|STCK_LWPR|"
 						+ "ASKP1|BIDP1|CNTG_VOL|ACML_VOL|ACML_TR_PBMN|SELN_CNTG_CSNU|SHNU_CNTG_CSNU|NTBY_CNTG_CSNU|CTTR|SELN_CNTG_SMTN|SHNU_CNTG_SMTN|CCLD_DVSN|"

@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -30,6 +31,8 @@ import com.smwas.comm.CommApi;
 import com.smwas.comm.ResponseWorker;
 import com.smwas.dbio.RealtimeChe;
 import com.smwas.dbio.RealtimeHo;
+import com.smwas.header.CommHeader;
+import com.smwas.io.SendRealData;
 import com.smwas.util.CommonUtil;
 import com.smwas.util.LOGCAT;
 import com.smwas.util.ReadProperties;
@@ -119,7 +122,7 @@ public class SessionItem {
 	public Map<String, Set<String>> getJmCode(String websocketId) {
 		Map<String, Set<String>> jmList = cGetJmList.get(websocketId);
 		if (!jmList.isEmpty()) {
-			LOGCAT.i(TAG, "getJmCode - " +jmList.toString());
+			LOGCAT.i(TAG, "[Client Jmcode List] - " +jmList.toString());
 			return jmList;
 		}
 		return null;
@@ -161,27 +164,32 @@ public class SessionItem {
 	public boolean addJmCode(String websocketId, String jmType ,String jmcode) {
 		Map<String, Set<String>> jmList = cGetJmList.get(websocketId);
 		boolean addFlag  = false;
+		boolean jmFlag = false; // 전체 종목에 추가 여부 
 		// 고객 종목 추가 
-		if(!jmList.isEmpty() && jmList!=null) {
+		if(jmList != null && !jmList.isEmpty()) {
 			if ((jmList.get(jmType) == null || jmList.get(jmType).isEmpty())) {
 				Set<String> codelist = new HashSet<>();
 				codelist.add(jmcode);
 				jmList.put(jmType, codelist);
 
-				LOGCAT.i(TAG, "addJmCode - 기존 데이터에 타입, 데이터 추가 "+jmList.toString());
+				LOGCAT.i(TAG, "addJmCode - 기존 데이터에 새로운 타입, 데이터 추가 "+jmList.toString());
 			}else {
 				jmList.get(jmType).add(jmcode);
 				LOGCAT.i(TAG, "addJmCode - 기존 데이터만 추가 "+jmList.toString());
+				if(jmList.get(jmType).contains(jmcode)) {
+					jmFlag = true;
+				}
 				addFlag = true;
+				
 			}
 		}else {
 			Set<String> codelist = new HashSet<>();
 			codelist.add(jmcode);
 			jmList.put(jmType, codelist);
 			LOGCAT.i(TAG, "addJmCode - 새로 추가 WebsocketID : " + websocketId + " jmList - [ "+ jmList.toString() + " ]");
+			
 		}
-		
-		if(!addFlag) {
+		if(!jmFlag) {
 			// 전체 종목 추가
 			if(!allJmCodeList.isEmpty() && allJmCodeList.get(jmType) != null) {
 				addFlag = !allJmCodeList.get(jmType).contains(jmcode);
@@ -196,7 +204,8 @@ public class SessionItem {
 	}
 	
 	/**
-	 * 요청한 종목이 있는 소켓에 조회 socket id 를 통해 websession 가져오기 ( C - W )
+	 * 요청한 종목이 있는 소켓 조회 
+	 * socketid 를 통해 websession 가져오기 ( C - W )
 	 * 
 	 * @param jmType
 	 * @param jmCode
@@ -204,20 +213,22 @@ public class SessionItem {
 	 */
 	public List<WebSocketSession> getJmCodeWebsocket(String jmType, String jmCode) {
 		List<WebSocketSession> sessionList = new ArrayList<>(); // 요청한 Client Session LIST
-	
+		String getWebsocket = "";
 		for (WebSocketSession websocket : cSessionList) {
 			
 			if(cGetJmList.get(websocket.getId()) != null && 
 					!cGetJmList.get(websocket.getId()).isEmpty() ) { // 고객이 요청한 데이터가 있을 경우 
-				LOGCAT.i(TAG, "webSocket ID - [ "+websocket.getId() + " ] \n 전체 종목 리스트 - [ "+allJmCodeList.toString()+ " ] \n 종목 리스트 - [ "+cGetJmList.get(websocket.getId()).toString()+ " ]");
+//				LOGCAT.i(TAG, "webSocket ID - [ "+websocket.getId() + " ] \n 전체 종목 리스트 - [ "+allJmCodeList.toString()+ " ] \n"
+//						+ " 종목 리스트 - [ "+cGetJmList.get(websocket.getId()).toString()+ " ]");
 				if(cGetJmList.get(websocket.getId()).get(jmType) != null ) { // 
 					if(cGetJmList.get(websocket.getId()).get(jmType).contains(jmCode)) {
+						getWebsocket += websocket.getId() + ", ";
 						sessionList.add(websocket);
 					}
-					
 				}
 			}
 		}
+//		LOGCAT.i(TAG, "[Socket with item] - " +getWebsocket);
 		return sessionList;
 	}
 
@@ -226,7 +237,7 @@ public class SessionItem {
 	 * 
 	 * @param key
 	 */
-	public void connectToServer(String key) {
+	public void connectToServer(String key, boolean reconFlag) {
 		try {
 			if (this.wsUri == null || wsPort == null) {
 				init(key);
@@ -249,12 +260,54 @@ public class SessionItem {
 					}
 				}
 			};
-
 			endPoint = new SessionHandler(new URI(wsUri + ":" + wsPort), msgHandle, conHandler); // 증권사 서버로 연결 시도
+			
+			// 재연결 시 재 조회 
+			if( !(this.allJmCodeList == null || this.allJmCodeList.isEmpty()) && reconFlag ) {
+				SendRealData data = new SendRealData();
+				data.setHeader(getCommHeader());
+				for(Map.Entry<String, List<String>> entry : allJmCodeList.entrySet()){
+					String type = entry.getKey();
+					List<String> uniqueList = entry.getValue().stream().distinct().collect(Collectors.toList());
+					if(uniqueList.size() > 0) {
+						for(String jmcode : uniqueList) {
+							data.getObjCommInput().put(type,jmcode);
+							Map<String, Object> rqData = new HashMap<String, Object>();
 
+							rqData.put("header", data.getHeader());
+							Map<String, Object> input = new HashMap<String, Object>();
+							input.put("input", data.getObjCommInput());
+							rqData.put("body", input);
+							String realReqJson = null;
+							try {
+								realReqJson = new ObjectMapper().writeValueAsString(rqData);
+								if (isSvrConnected == true) {
+									LOGCAT.i(TAG + " [재접속으로 인해 한투 서버에 보냄] : ", realReqJson);
+									endPoint.sendMessage(realReqJson); // 메세지 발송하여 웹소켓 연결 끊기지 않게 함
+								}
+							} catch (JsonProcessingException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							
+						}
+					}
+				}
+			}
 		} catch (URISyntaxException ex) {
 			LOGCAT.i(TAG, "URISyntaxException exception: " + ex.getMessage());
 		}
+	}
+	/**
+	 * 한투 서버로 실시간 해더 
+	 * 
+	 */
+	public Map<String, String> getCommHeader() {
+		Map<String, String> realHeader = new HashMap<String, String>();
+		realHeader.put("approval_key", CommHeader.getApproval_key());
+		realHeader.put("custtype", CommHeader.getCusttype());
+		realHeader.put("tr_type", "1"); // 1: 등록, 2: 해제
+		return realHeader;
 	}
 	
 	/**
@@ -291,19 +344,33 @@ public class SessionItem {
 	 * @param websocketId
 	 */
 	public void sendRush(List<RealtimeChe> cheList, List<RealtimeHo> hoList, String websocketId) {
-
-		List<Object> listToSend = new ArrayList<>(hoList.isEmpty() ? cheList : hoList);
-		listToSend.forEach(entity -> {
-			try {
-				String str = CommonUtil.objectToString(entity);
-				getWebsocket(websocketId).sendMessage(new TextMessage(str));
-
-			} catch (IOException e) {
-				e.printStackTrace();
-				LOGCAT.i(TAG, e.toString());
-			}
-		});
-
+		if(this.isRushConnected) {
+			LOGCAT.i(TAG, "체결 ::" + cheList.size() + " 호가 :: "+hoList.size());
+			List<Object> listToSend = new ArrayList<>();
+			listToSend.addAll(hoList);
+			listToSend.addAll(cheList);
+			listToSend.forEach(entity -> {
+				try {
+					String str = CommonUtil.objectToString(entity);
+					synchronized(getWebsocket(websocketId)) {
+						getWebsocket(websocketId).sendMessage(new TextMessage(str));
+					}
+					
+				} catch (IOException e) {
+					e.printStackTrace();
+					LOGCAT.i(TAG, e.toString());
+				}
+			});
+			
+		}else {
+			scheduler.shutdownNow();
+		}
+//		if(this.isRushConnected) {
+//			scheduler.execute(() -> sendRush(cheList, hoList, websocketId));
+//		}else {
+//			scheduler.shutdownNow();
+//		}
+		
 	}
 	
 	/**
@@ -316,15 +383,18 @@ public class SessionItem {
 	public void startSendingRush(List<RealtimeChe> cheList, List<RealtimeHo> hoList, String websocketId) {
 		if(!isRushConnected) {
 			this.isRushConnected = true;
-			this.crushList.put(websocketId, "true");
+//			if(!this.crushList.get(websocketId).equals("true")) {
+				this.crushList.put(websocketId, "true");
+//			}
 			
-			if (cheList.isEmpty() && hoList.isEmpty()) {
+			if (!(cheList.size() > 0) && !( hoList.size() > 0 ) ) {
 				LOGCAT.w(TAG, "TrCode 를 확인하세요.");
 			} else {
-				LOGCAT.i(TAG, "Rush Test START");
-				scheduler.scheduleAtFixedRate(() -> {
+				LOGCAT.i(TAG, "Rush Test START :: " + cheList.size());
+//				scheduler.execute(() -> sendRush(cheList, hoList, websocketId));
+				scheduler.scheduleWithFixedDelay(() -> {
 					sendRush(cheList, hoList, websocketId);
-				}, 0, 5, TimeUnit.SECONDS);
+				}, 0, 1, TimeUnit.SECONDS);
 			}
 		}
 	}
@@ -351,7 +421,7 @@ public class SessionItem {
 
         // 새로운 스레드 풀 생성
        scheduler = Executors.newScheduledThreadPool(5);
-		LOGCAT.i(TAG, "Rush Test End");
+       LOGCAT.i(TAG, "Rush Test End");
 	}
 
 	/**
@@ -377,20 +447,30 @@ public class SessionItem {
 			switch (tr_id) {
 			case "H0STASP0":	// 실시간 호가
 			case "H0STCNT0":	// 실시간 체결
-//				LOGCAT.i(TAG, "[PINGPONG RECV] " + this.mKey + "  ::  " + message.toString());
+				
 				if (mWebSocket != null) {
 					message = ResponseWorker.getInstance().responseData(mData[3], tr_id);
 					if (message != null) {
 						TextMessage resultMessage = new TextMessage(message);
-						try {
+						
 							for (int i = 0; i < mWebSocket.size(); i++) {
-								mWebSocket.get(i).sendMessage(resultMessage);
+//								LOGCAT.i(TAG, "[Socket SIZE] - "+mWebSocket.size()+" :: [Message] - "  + message);
+								try {
+									// 세션이 이미 닫혀있으면 삭제 필요 
+									if(mWebSocket.get(i).isOpen()) {
+										synchronized(mWebSocket.get(i)) {
+											mWebSocket.get(i).sendMessage(resultMessage);
+										}
+									}else {
+										removeSession(mWebSocket.get(i));
+									}
+								} catch (IOException e) {
+									e.printStackTrace();
+									LOGCAT.i(TAG, e.toString());	// 에러 로그 쓰기
+									removeSession(mWebSocket.get(i));
+								}
 							}
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-							LOGCAT.i(TAG, e.toString());	// 에러 로그 쓰기
-						}
+						
 					}
 				}
 				break;
@@ -416,33 +496,53 @@ public class SessionItem {
 					this.endPoint.sendMessage(message); // 메세지 발송하여 웹소켓 연결 끊기지 않게 함
 					
 				} else {
+					
 					if (mWebSocket != null) {
 						TextMessage resultMessage = new TextMessage(message);
 						for (int i = 0; i < mWebSocket.size(); i++) {
-							mWebSocket.get(i).sendMessage(resultMessage);
+//							mWebSocket.get(i).sendMessage(resultMessage);
+							try {
+								// 세션이 이미 닫혀있으면 삭제 필요 
+								if(mWebSocket.get(i).isOpen()) {
+									synchronized(mWebSocket.get(i)) {
+										mWebSocket.get(i).sendMessage(resultMessage);
+									}
+								}else {
+									removeSession(mWebSocket.get(i));
+								}
+							} catch (IOException e) {
+								e.printStackTrace();
+								LOGCAT.i(TAG, e.toString());	// 에러 로그 쓰기
+								removeSession(mWebSocket.get(i));
+							}
 						}
 					}
 				}
 			} catch (ParseException e) {
 				try {
-					for (WebSocketSession websocket : this.cSessionList) {
-						websocket.close();
+					if(this.cSessionList != null) {
+						for (WebSocketSession websocket : this.cSessionList) {
+							websocket.close();
+						}
 					}
 				} catch (IOException e1) {
 					e1.printStackTrace();
 					LOGCAT.i(TAG, e1.toString());	// 에러 로그 쓰기
 				}
-				mWebSocket = null;
+				mWebSocket = new ArrayList<>();
 			} catch (Exception e) {
 				try {
-					for (WebSocketSession websocket : this.cSessionList) {
-						websocket.close();
+					LOGCAT.i(TAG, e.toString());	// 에러 로그 쓰기
+					if(this.cSessionList != null) {
+						for (WebSocketSession websocket : this.cSessionList) {
+							websocket.close();
+						}
 					}
 				} catch (IOException e1) {
 					e1.printStackTrace();
 					LOGCAT.i(TAG, e1.toString());	// 에러 로그 쓰기
 				}
-				mWebSocket = null;
+				mWebSocket = new ArrayList<>();
 			}
 		}
 	}
@@ -461,6 +561,7 @@ public class SessionItem {
 		
 		// 러쉬 테스트 취소 
 		if(this.crushList.get(socket.getId()) != null && crushList.get(socket.getId()).equals("true") ) {
+			LOGCAT.i(TAG, "RemoveSession 러쉬테스트 종료 ");
 			stopSendingRush(socket.getId());
 		}
 		
@@ -473,35 +574,41 @@ public class SessionItem {
 				// 2. 세션 연결 해제 클라이언트의 종목 가져옴 
 				for(String jmType : cJm.keySet()) {
 					LOGCAT.i(TAG, "RemoveSession - 2 ITEM " + jmType );
+					// 종목 타입에 따른 전체 종목 리스트 
 					cjmlist = cJm.get(jmType);
 					// 문자열과 개수를 저장할 Map 생성
 					Map<String, Integer> stringCounts = new HashMap<>();
 					
 					// 3. 종목이 있을 경우 
-					if( cjmlist.size() > 0 ) {
+					if( cjmlist.size() > 0 && jmList.get(jmType)!= null ) {
 						// 4. 전체 종목
-						// 4-1. 전체 종목 안에 해당 종목 갯수 파악 
-						for(String jmcode : jmList.get(jmType)) {
-							if(cjmlist.contains(jmcode)) { 
-								stringCounts.put(jmcode, stringCounts.getOrDefault(jmcode, 0) + 1);
-							}
-						}
-						for (String str : stringCounts.keySet()) {
-							// 해당 종목 코드가 2개보다 적을 경우 
-							if(stringCounts.get(str) < 2) {
-								jmList.get(jmType).remove(str);
-								Map<String,Object> data =  CommApi.getInstance().createCancelReal(jmType, str);
-								try {
-									// 해당 종목 실시간 끊음
-									String realReqJson = new ObjectMapper().writeValueAsString(data);
-									endPoint.sendMessage(realReqJson);
-								} catch (JsonProcessingException e) {
-									e.printStackTrace();
+						// 4-1. 전체 종목 안에 해당 종목 갯수 파악, 종목 타입은 있는데 종목이 없을 경우 예외처리
+						if(jmList.get(jmType).size() > 0) {
+							for(String jmcode : jmList.get(jmType)) {
+								if(cjmlist.contains(jmcode)) { 
+									stringCounts.put(jmcode, stringCounts.getOrDefault(jmcode, 0) + 1);
 								}
 							}
-							// 해당 종목 코드가 2개보다 많을 경우 전체 종목에서 하나만 제거한다 
-							else {
-								jmList.get(jmType).remove(str);
+						}
+						// 4-2 전체 종목 안에 해당 종목 갯수 파악 후 유무 예외처리 
+						if(stringCounts.size() > 0) {
+							for (String str : stringCounts.keySet()) {
+								// 해당 종목 코드가 2개보다 적을 경우 
+								if(stringCounts.get(str) < 2) {
+									jmList.get(jmType).remove(str);
+									Map<String,Object> data =  CommApi.getInstance().createCancelReal(jmType, str);
+									try {
+										// 해당 종목 실시간 끊음
+										String realReqJson = new ObjectMapper().writeValueAsString(data);
+										this.endPoint.sendMessage(realReqJson);
+									} catch (JsonProcessingException e) {
+										e.printStackTrace();
+									}
+								}
+								// 해당 종목 코드가 2개보다 많을 경우 전체 종목에서 하나만 제거한다 
+								else {
+									jmList.get(jmType).remove(str);
+								}
 							}
 						}
 						this.allJmCodeList = jmList;
@@ -512,13 +619,22 @@ public class SessionItem {
 				setList.remove(socket);
 				this.cSessionList = setList;
 				this.cGetJmList.remove(socket.getId());
+			}else if(setList.size() > 1) {
+				LOGCAT.i(TAG, "소켓 연결 2인 이상");
+				setList.remove(socket);
+				this.cSessionList = setList;
 			}
-			// 1-2. 소켓 연결한 클라이언트가 본인 한명일 경우 초기화  
+			// 1-3. 소켓 연결한 클라이언트가 본인 한명일 경우 초기화  
 			else {
+				LOGCAT.i(TAG, "소켓 연결 1인");
 				this.cSessionList = new ArrayList<>();
 				this.allJmCodeList = new HashMap<>();
 				this.cGetJmList = new HashMap<>();
 			}
+		}else {
+			LOGCAT.i(TAG, "종목이 없을 경우, 소켓 삭제 ");
+			setList.remove(socket);
+			this.cSessionList = setList;
 		}
 	}
 	
@@ -571,6 +687,24 @@ public class SessionItem {
 
 		return false;
 	}
+	/**
+	 * Session ID LIST  return String
+	 * 
+	 * @return String
+	 */
+	public String isListIdString() {
+		List<String> sessionIdStr = new ArrayList<>();
+		if (this.cSessionList.size() > 0 ) {
+			for(WebSocketSession websocket : this.cSessionList) {
+				sessionIdStr.add(websocket.getId());
+			}
+			return sessionIdStr.toString();
+		}
+		
+		return "";
+	}
+	
+	
 
 	public List<WebSocketSession> getcSessionList() {
 		return cSessionList;
@@ -646,6 +780,11 @@ public class SessionItem {
 
 	public String toString() {
 		String sessionStr = "";
-		return "SESSION ITEM - [ mWebSocketId : " + sessionStr + " ]";
+		if(!this.cSessionList.isEmpty() || this.cSessionList != null) {
+			for(WebSocketSession session : this.cSessionList) {
+				sessionStr += session.getId() + " ";
+			}
+		}
+		return "SESSION ITEM - [ mWebSocketId : " + sessionStr + "]";
 	}
 }

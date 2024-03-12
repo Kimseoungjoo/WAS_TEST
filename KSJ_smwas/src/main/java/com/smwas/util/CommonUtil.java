@@ -40,6 +40,30 @@ public class CommonUtil {
 		String result = mapper.writeValueAsString(output); // Java Object -> JSONString 으로 직렬화
 		return result;
 	}
+	/**
+	 * String -> Object
+	 * 
+	 * @param output
+	 * @return
+	 * @throws JsonProcessingException
+	 */
+	public static Object objectToString(String output) throws JsonProcessingException {
+		ObjectMapper mapper = new ObjectMapper();
+		 Object result = mapper.readValue(output, Object.class); // Java Object -> JSONString 으로 직렬화
+		return result;
+	}
+	/**
+	 * Object -> Map<String, Object
+	 * 
+	 * @param output
+	 * @return
+	 * @throws JsonProcessingException
+	 */
+	public static Map<String, Object> objecttoMap(Object output) throws JsonProcessingException {
+		ObjectMapper objectMapper = new ObjectMapper();
+		Map<String, Object> result = objectMapper.convertValue(output, Map.class);
+		return result;
+	}
 	
 
 	/**
