@@ -94,9 +94,7 @@ public class CommonUtil {
 	public static List<Object> stringToList(String strJson) {
 		try {
 			ObjectMapper mapper = new ObjectMapper();
-			List<Object> list = mapper.readValue(strJson, new TypeReference<List<Object>>() {
-			});
-
+			List<Object> list = mapper.readValue(strJson, new TypeReference<List<Object>>() {});
 			return list;
 		} catch (Exception e) {
 			e.printStackTrace();

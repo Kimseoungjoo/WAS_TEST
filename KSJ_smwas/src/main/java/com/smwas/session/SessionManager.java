@@ -7,12 +7,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import com.smwas.util.LOGCAT;
+import com.smwas.web.SessionHandler;
 
 public class SessionManager {
 	private static final String TAG = SessionManager.class.getSimpleName();
@@ -51,13 +53,20 @@ public class SessionManager {
 	 * Sessionmanager .
 	 */
 	public void reConnect() {
-		if (!mSessionList.isEmpty()) {
-			SessionItem item = mSessionList.get(0);
-			String key = item.getKey();
-			item.init(key);
-			item.connectToServer(key,true);
-			LOGCAT.i(TAG, "통신 재연결");
-		}
+		initializedSession();
+//		if (!mSessionList.isEmpty()) {
+//			SessionItem item = mSessionList.get(0);
+//			String key = item.getKey();
+//			
+//			item.setcSessionList(new ArrayList<>());
+//			item.setcGetJmList(new HashMap<>());
+//			item.setCrushList(new HashMap<>());
+//			item.setAllJmCodeList(new HashMap<>());
+//			
+//			item.init(key);
+//			item.connectToServer(key,true);
+//			LOGCAT.i(TAG, "통신 재연결");
+//		}
 	}
 	/**
 	 * SessionManager를 초기화한다.

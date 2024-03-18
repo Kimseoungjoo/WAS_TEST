@@ -165,41 +165,52 @@ public class SessionItem {
 		Map<String, Set<String>> jmList = cGetJmList.get(websocketId);
 		boolean addFlag  = false;
 		boolean jmFlag = false; // 전체 종목에 추가 여부 
-		// 고객 종목 추가 
+		
+		// 0. 고객 종목 추가 
 		if(jmList != null && !jmList.isEmpty()) {
+			// 1. 고객 종목에 type(호가/체결) 관련 데이터 유무,
 			if ((jmList.get(jmType) == null || jmList.get(jmType).isEmpty())) {
+				// 1-1. 데이터에 새로운 종목 타입, 종목 추가 
 				Set<String> codelist = new HashSet<>();
 				codelist.add(jmcode);
 				jmList.put(jmType, codelist);
 
-				LOGCAT.i(TAG, "addJmCode - 기존 데이터에 새로운 타입, 데이터 추가 "+jmList.toString());
+				LOGCAT.i(TAG, "[addJmCode - 기존 데이터에 새로운 타입, 데이터 추가] "+jmList.toString());
 			}else {
-				jmList.get(jmType).add(jmcode);
-				LOGCAT.i(TAG, "addJmCode - 기존 데이터만 추가 "+jmList.toString());
+				// 1-2. 고객 종목에 type이 있을 경우 데이터만 추가 
 				if(jmList.get(jmType).contains(jmcode)) {
 					jmFlag = true;
 				}
+				jmList.get(jmType).add(jmcode);
+				LOGCAT.i(TAG, "[addJmCode - 기존 데이터만 추가] "+jmList.toString());
 				addFlag = true;
 				
 			}
 		}else {
+			// 2. 종목 데이터 추가 
 			Set<String> codelist = new HashSet<>();
 			codelist.add(jmcode);
 			jmList.put(jmType, codelist);
-			LOGCAT.i(TAG, "addJmCode - 새로 추가 WebsocketID : " + websocketId + " jmList - [ "+ jmList.toString() + " ]");
+			LOGCAT.i(TAG, "[addJmCode - 새로 추가] WebsocketID : " + websocketId + " jmList - [ "+ jmList.toString() + " ]");
 			
 		}
+		// 전체 종목 여부 
 		if(!jmFlag) {
-			// 전체 종목 추가
+			LOGCAT.i(TAG, "[addJmCode - 전체 종목 추가]");
+			
+			// 3. 전체 종목 추가
 			if(!allJmCodeList.isEmpty() && allJmCodeList.get(jmType) != null) {
 				addFlag = !allJmCodeList.get(jmType).contains(jmcode);
 				allJmCodeList.get(jmType).add(jmcode);
 			}else {
+				addFlag = true;
 				List<String> addJm = new ArrayList<>();
 				addJm.add(jmcode);
 				allJmCodeList.put(jmType, addJm);
 			}
 		}
+		
+		LOGCAT.i(TAG, "( "+Boolean.toString(addFlag) + " ) 전체 종목 리스트 - [ " + allJmCodeList.toString() + " ]");
 		return addFlag;
 	}
 	
@@ -263,37 +274,37 @@ public class SessionItem {
 			endPoint = new SessionHandler(new URI(wsUri + ":" + wsPort), msgHandle, conHandler); // 증권사 서버로 연결 시도
 			
 			// 재연결 시 재 조회 
-			if( !(this.allJmCodeList == null || this.allJmCodeList.isEmpty()) && reconFlag ) {
-				SendRealData data = new SendRealData();
-				data.setHeader(getCommHeader());
-				for(Map.Entry<String, List<String>> entry : allJmCodeList.entrySet()){
-					String type = entry.getKey();
-					List<String> uniqueList = entry.getValue().stream().distinct().collect(Collectors.toList());
-					if(uniqueList.size() > 0) {
-						for(String jmcode : uniqueList) {
-							data.getObjCommInput().put(type,jmcode);
-							Map<String, Object> rqData = new HashMap<String, Object>();
-
-							rqData.put("header", data.getHeader());
-							Map<String, Object> input = new HashMap<String, Object>();
-							input.put("input", data.getObjCommInput());
-							rqData.put("body", input);
-							String realReqJson = null;
-							try {
-								realReqJson = new ObjectMapper().writeValueAsString(rqData);
-								if (isSvrConnected == true) {
-									LOGCAT.i(TAG + " [재접속으로 인해 한투 서버에 보냄] : ", realReqJson);
-									endPoint.sendMessage(realReqJson); // 메세지 발송하여 웹소켓 연결 끊기지 않게 함
-								}
-							} catch (JsonProcessingException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							
-						}
-					}
-				}
-			}
+//			if( !(this.allJmCodeList == null || this.allJmCodeList.isEmpty()) && reconFlag ) {
+//				SendRealData data = new SendRealData();
+//				data.setHeader(getCommHeader());
+//				for(Map.Entry<String, List<String>> entry : allJmCodeList.entrySet()){
+//					String type = entry.getKey();
+//					List<String> uniqueList = entry.getValue().stream().distinct().collect(Collectors.toList());
+//					if(uniqueList.size() > 0) {
+//						for(String jmcode : uniqueList) {
+//							data.getObjCommInput().put(type,jmcode);
+//							Map<String, Object> rqData = new HashMap<String, Object>();
+//
+//							rqData.put("header", data.getHeader());
+//							Map<String, Object> input = new HashMap<String, Object>();
+//							input.put("input", data.getObjCommInput());
+//							rqData.put("body", input);
+//							String realReqJson = null;
+//							try {
+//								realReqJson = new ObjectMapper().writeValueAsString(rqData);
+//								//if (isSvrConnected == true) {
+//									LOGCAT.i(TAG + " [재접속으로 인해 한투 서버에 보냄] : ", realReqJson);
+//									endPoint.sendMessage(realReqJson); // 메세지 발송하여 웹소켓 연결 끊기지 않게 함
+//								//}
+//							} catch (JsonProcessingException e) {
+//								// TODO Auto-generated catch block
+//								e.printStackTrace();
+//							}
+//							
+//						}
+//					}
+//				}
+//			}
 		} catch (URISyntaxException ex) {
 			LOGCAT.i(TAG, "URISyntaxException exception: " + ex.getMessage());
 		}

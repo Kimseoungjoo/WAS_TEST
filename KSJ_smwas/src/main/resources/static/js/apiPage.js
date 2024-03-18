@@ -320,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 웹소켓 연결, 수신
 function setWebSocket() {
-	socket = new WebSocket('ws://203.109.30.208:10001/connect');
+	socket = new WebSocket('ws://203.109.30.207:10001/connect');
 
 
 	socket.onerror = function(error) {

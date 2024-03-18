@@ -102,11 +102,12 @@ public class CommApi {
 	public static Map<String, Object> checkRequest(SendTrData data) {
 
 		boolean flag = true;
-		if (TranFile.getInstance().getTrId(data.getTrCode()) != null) {
+		
+		if (TranFile.getInstance().getUrl(data.getTrCode()) != null || (data.getObjCommInput().isEmpty() || data.getObjCommInput() == null) ) {
 			String url = CommonUtil.getUrlLastSegment(data.getTrCode());
 			Map<String, String> inputValueMap = data.getObjCommInput();
 			LOGCAT.i(TAG, "[checkRequest] - " + url + " :: "+ inputValueMap.toString());
-			if( !(data.getObjCommInput() == null || data.getObjCommInput().isEmpty()) ) {
+			if( !(inputValueMap == null || inputValueMap.isEmpty()) ) {
 				
 				for (Map.Entry<String, String> entry : inputValueMap.entrySet()) {
 					String key = entry.getKey();
@@ -172,7 +173,7 @@ public class CommApi {
 						}
 					}
 					default -> {
-//				flag = false;
+//						flag = false;
 						break;
 					}
 					}
@@ -207,8 +208,6 @@ public class CommApi {
 			}else {
 				flag = false;
 			}
-
-
 		}
 
 		Map<String, Object> checkingResult = new HashMap<>();
@@ -292,10 +291,10 @@ public class CommApi {
 							dataFlag = false;
 						} else {
 							// inquire-asking-price-exp-ccn URL -
-							if (data.getTrCode().contains(TranFile.INQUIRE_ASK_PRICE_EXP)) {
+							if (CommonUtil.getUrlLastSegment(data.getTrCode()).contains(TranFile.INQUIRE_ASK_PRICE_EXP)) {
 								Map<String, String> test = (Map<String, String>) outlec.get("output1");
-								if (test.get("aspr_acpt_hour").equals("000000")) {
-									dataFlag = true; // TODO :: 추후에 변경이 필요할 수 있음. 현재 잘못된 응답값 정상으로 보냄 dataFlag = false;
+								if (test.get("asp1").equals("0")) {
+									dataFlag = false; // TODO :: 추후에 변경이 필요할 수 있음. 현재 잘못된 응답값 정상으로 보냄 dataFlag = false;
 								} else {
 									dataFlag = true;
 								}
@@ -527,73 +526,76 @@ public class CommApi {
 			LOGCAT.i(TAG, "Session List - [ " + SessionManager.getInstance().getSessionString() + " ] ("
 					+ Boolean.toString(item.isSvrConnected()) + ")");
 			if (item.isSvrConnected()) {
-				LOGCAT.i(TAG, "test - 1");
-				if (item.getKey() != null) {
+				LOGCAT.i(TAG, "리얼 통신 - 한투 연결 true");
+				if (item.getKey() != null && getSession != null) {
 					// C -W 연결 Session
-					LOGCAT.i(TAG, "test - 2");
+					LOGCAT.i(TAG, "리얼 통신 - 세션 연결 여부 true ");
 					String tr_id = (String) data.getObjCommInput().get("tr_id"); // 호가, 체결 구분 변수
 					String tr_key = trkey; // 종목 코드 값
-					if (data.getObjCommInput().get("tr_key") instanceof List) {
-						List<String> trKeyList = (List<String>) data.getObjCommInput().get("tr_key");
-						for (String key : trKeyList) {
-							tr_key = key;
-							// 종목을 등록하는 경우
-							if (data.getHeader().get("tr_type").equals("1")) {
-								LOGCAT.i(TAG, "test - 3");
-								LOGCAT.i(TAG, "Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key
-										+ " ]");
-								addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
-							} else {
-								LOGCAT.i(TAG, "test - 4");
-								LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : "
-										+ tr_key + " ]");
-								if (item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
-									if (item.getAllJmCodeList().get(tr_id) != null
-											&& item.getJmCode(sessionId).get(tr_id) != null) {
-										item.getJmCode(sessionId).get(tr_id).remove(tr_key);
-										item.getAllJmCodeList().get(tr_id).remove(tr_key);
-
-										removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
-										LOGCAT.i(TAG, "[ " + tr_key + " ] 통신 해제 ");
-									}
-								}
-							}
-							Map<String, Object> rqData = new HashMap<String, Object>();
-
-							if (createRealHeader(data) != null && data.getObjCommInput() != null) {
-								rqData.put("header", createRealHeader(data));
-								Map<String, Object> input = new HashMap<String, Object>();
-								input.put("input", data.getObjCommInput());
-								rqData.put("body", input);
-							}
-							if (rqData != null) {
-								// RushTest 를 위한 코드 수정
-								if (addFlag || removeFlag) {
-									item.sendRealRq(rqData, sessionId);
-								}
-								realFlag = true;
-								return realFlag;
-							}
-						}
-					} else {
-						tr_key = (String) data.getObjCommInput().get("tr_key");
+//					if (data.getObjCommInput().get("tr_key") instanceof List) {
+//						List<String> trKeyList = (List<String>) data.getObjCommInput().get("tr_key");
+//						for (String key : trKeyList) {
+//							tr_key = key;
+//							// 종목을 등록하는 경우
+//							if (data.getHeader().get("tr_type").equals("1")) {
+//								LOGCAT.i(TAG, "test - 3");
+//								LOGCAT.i(TAG, "Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key
+//										+ " ]");
+//								addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
+//							} else {
+//								LOGCAT.i(TAG, "test - 4");
+//								LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : "
+//										+ tr_key + " ]");
+//								if (item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
+//									if (item.getAllJmCodeList().get(tr_id) != null
+//											&& item.getJmCode(sessionId).get(tr_id) != null) {
+//										item.getJmCode(sessionId).get(tr_id).remove(tr_key);
+//										item.getAllJmCodeList().get(tr_id).remove(tr_key);
+//
+//										removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
+//										LOGCAT.i(TAG, "[ " + tr_key + " ] 통신 해제 ");
+//									}
+//								}
+//							}
+//							Map<String, Object> rqData = new HashMap<String, Object>();
+//
+//							if (createRealHeader(data) != null && data.getObjCommInput() != null) {
+//								rqData.put("header", createRealHeader(data));
+//								Map<String, Object> input = new HashMap<String, Object>();
+//								input.put("input", data.getObjCommInput());
+//								rqData.put("body", input);
+//							}
+//							if (rqData != null) {
+//								// RushTest 를 위한 코드 수정
+//								if (addFlag || removeFlag) {
+//									item.sendRealRq(rqData, sessionId);
+//								}
+//								realFlag = true;
+//								return realFlag;
+//							}
+//						}
+//					} else {
+//						tr_key = (String) data.getObjCommInput().get("tr_key");
 						// 종목을 등록하는 경우
 						if (data.getHeader().get("tr_type").equals("1")) {
-							LOGCAT.i(TAG, "test - 5");
-							LOGCAT.i(TAG,"Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key + " ]");
-							addFlag = !item.addJmCode(sessionId, tr_id, tr_key);
+							LOGCAT.i(TAG, "[REQUEST REAL] - add " + tr_id + ", "+tr_key);
+//							LOGCAT.i(TAG,"Session add Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key + " ]");
+							addFlag = item.addJmCode(sessionId, tr_id, tr_key);
 						} else {
-							LOGCAT.i(TAG, "test - 6");
-							LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key
-									+ " ]");
+							
+//							LOGCAT.i(TAG, "Session remove Data - [ ID : " + getSession.getId() + " JMCODE : " + tr_key+ " ]");
 							if (item.getAllJmCodeList() != null && item.getcGetJmList().get(sessionId) != null) {
 								if (item.getAllJmCodeList().get(tr_id) != null
 										&& item.getJmCode(sessionId).get(tr_id) != null) {
-									item.getJmCode(sessionId).get(tr_id).remove(tr_key);
-									item.getAllJmCodeList().get(tr_id).remove(tr_key);
+									LOGCAT.i(TAG, "리얼 통신 - remove - 1 ");
+									if(item.getJmCode(sessionId).get(tr_id).contains(tr_key)) {
+										LOGCAT.i(TAG, "리얼 통신 - remove -2  "+ tr_id + ", "+tr_key);
+										item.getJmCode(sessionId).get(tr_id).remove(tr_key);
+										item.getAllJmCodeList().get(tr_id).remove(tr_key);
+									}
 
 									removeFlag = !item.getAllJmCodeList().get(tr_id).contains(tr_key);
-									LOGCAT.i(TAG, "[ " + tr_key + " ] 통신 해제 ");
+									LOGCAT.i(TAG, "[ " + tr_key + " ] -" + tr_id + " 통신 해제 ");
 								}
 							}
 						}
@@ -609,15 +611,18 @@ public class CommApi {
 						if (rqData != null) {
 							// RushTest 를 위한 코드 수정
 							if (addFlag || removeFlag) {
+								LOGCAT.i(TAG, "[리얼 통신 - 연결] 종목추가(" +Boolean.toString(addFlag)+"}, 종목제거("+Boolean.toString(removeFlag)+")" );
 								item.sendRealRq(rqData, sessionId);
 							}
 							realFlag = true;
 							return realFlag;
+						}else {
+							LOGCAT.i(TAG ,"[리얼 통신] - 연결하지 않음");
 						}
-					}
+//					}
 				}
 			} else {
-				LOGCAT.i(TAG, "test - 5");
+				LOGCAT.i(TAG, "리얼 통신 END 한투 - WAS 재연결");
 				// 서버 연결 끊어졌을 경우
 				SessionManager.getInstance().reConnect();
 				callRealAPI(data,trkey);
@@ -737,7 +742,7 @@ public class CommApi {
 		// data 없을 경우
 		if (checkData != null) {
 			if (trkey == null
-					|| trkey.isEmpty()) {
+					|| trkey.isEmpty() || trkey.length() > 8 || trkey.length() < 6 ) {
 				response.put("msg_cd", "OPSP9990");
 				response.put("msg1", ErrorFile.getInstance().getErrorMsg("OPSP9990"));
 				response.put("rt_cd", "1");

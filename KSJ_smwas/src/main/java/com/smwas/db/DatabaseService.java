@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,12 +50,17 @@ import com.smwas.tr.TranFile;
 import com.smwas.util.CommonUtil;
 import com.smwas.util.LOGCAT;
 
+import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
+
 /**
  * 실제 DB 상호작용 담당 하나의 서비스 단위 commit, rollback 되어야할 기능들 정의
  */
 @Service
+@EnableJpaRepositories("com.smwas.dbrepo")
 @Transactional(readOnly = true) // 별도의 설정이 없을 경우, readOnly 로 동작됨
 public class DatabaseService {
+	
 	@Autowired
 	private InquirePriceRepository inquirePriceRepository;
 	@Autowired
@@ -74,7 +81,41 @@ public class DatabaseService {
 	private TimeItemRepository timeItemRepository;
 	@Autowired
 	private InquireItemChartRepository inquireChartRepository;
-
+	
+//	private final InquirePriceRepository inquirePriceRepository;
+//    private final InquireMemberRepository inquireMemberRepository;
+//    private final InquireInvestorRepository inquireInvestorRepository;
+//    private final InquireCcnlRepository inquireCcnlRepository;
+//    private final InquireAskPriceRepository inquireAskPriceRepository;
+//    private final DailyIndexRepository dailyIndexRepository;
+//    private final DailyItemRepository dailyItemRepository;
+//    private final DailyPriceRepository dailyPriceRepository;
+//    private final TimeItemRepository timeItemRepository;
+//    private final InquireItemChartRepository inquireChartRepository;
+//    @Autowired
+//    public DatabaseService(
+//            InquirePriceRepository inquirePriceRepository,
+//            InquireMemberRepository inquireMemberRepository,
+//            InquireInvestorRepository inquireInvestorRepository,
+//            InquireCcnlRepository inquireCcnlRepository,
+//            InquireAskPriceRepository inquireAskPriceRepository,
+//            DailyIndexRepository dailyIndexRepository,
+//            DailyItemRepository dailyItemRepository,
+//            DailyPriceRepository dailyPriceRepository,
+//            TimeItemRepository timeItemRepository,
+//            InquireItemChartRepository inquireChartRepository) {
+//        this.inquirePriceRepository = inquirePriceRepository;
+//        this.inquireMemberRepository = inquireMemberRepository;
+//        this.inquireInvestorRepository = inquireInvestorRepository;
+//        this.inquireCcnlRepository = inquireCcnlRepository;
+//        this.inquireAskPriceRepository = inquireAskPriceRepository;
+//        this.dailyIndexRepository = dailyIndexRepository;
+//        this.dailyItemRepository = dailyItemRepository;
+//        this.dailyPriceRepository = dailyPriceRepository;
+//        this.timeItemRepository = timeItemRepository;
+//        this.inquireChartRepository = inquireChartRepository;
+//    }
+	
 	public static final String TAG = DatabaseService.class.getSimpleName();
 	
 	PK_inquire pk_inquire;
@@ -138,7 +179,14 @@ public class DatabaseService {
 			output1 = CommonUtil.objectToString((Object) outrec.get("output1"));
 			output2 = CommonUtil.objectToString((Object) outrec.get("output2"));
 			InquireAskPrice row5 = new InquireAskPrice(mrktType, jmCode, output1, output2);
-			inquireAskPriceRepository.save(row5);
+			Map<String, String> checkOutput1 =  (Map<String,String>) outrec.get("output1");
+//			if(checkOutput1.get("askp1").equals("0") && checkOutput1.get("bidp1").equals("0")) {
+//				LOGCAT.i(TAG, "["+url+"] - 장시간이 아닙니다.");
+//				flag = false;
+//			}else {
+//				LOGCAT.i(TAG, "["+url+"] - 장시간 입니다.");
+				inquireAskPriceRepository.save(row5);
+//			}
 		}
 		case TranFile.INQUIRE_DAILY_INDEX -> {
 			date1 = (String) header.get("FID_INPUT_DATE_1");
@@ -154,21 +202,30 @@ public class DatabaseService {
 			date2 = (String) header.get("FID_INPUT_DATE_2");
 			periodCode = (String) header.get("FID_PERIOD_DIV_CODE");
 			orgAdj = (String) header.get("FID_ORG_ADJ_PRC");
+			
+			
 			output1 = CommonUtil.objectToString((Object) outrec.get("output1"));
 			output2 = CommonUtil.objectToString((Object) outrec.get("output2"));
-			if (outrec.get("output2") instanceof List) {
-				for (Map<String, String> outputObj : (List<Map<String, String>>) outrec.get("output2")) {
-					String chartData = CommonUtil.objectToString(outputObj);
-					String stck_bsop_date = outputObj.get("stck_bsop_date");
-					if(!outputObj.isEmpty()) {
-						InquireItemChart row10 = new InquireItemChart(jmCode, stck_bsop_date, chartData);
-						inquireChartRepository.save(row10);
-					}
-					// TODO:: 데이터 여부에 따라 처리 .
+			
+			if (outrec.get("output2") instanceof List  && periodCode.equals("D")) {
+				LOGCAT.i(TAG, "[DB SAVE] - " +jmCode + " OUTPUT - [ "+ output2.toString() + " ] " );
+				List<Map<String, String>> outrecList =  (List<Map<String, String>>)outrec.get("output2");
+				if( outrecList.size() > 0) {
+					LOGCAT.i(TAG, "[ chart Data SAVE DB (inquire_itemchartprice)]");
+					for (Map<String, String> outputObj : outrecList) {
+						String chartData = CommonUtil.objectToString(outputObj);
+						String stck_bsop_date = outputObj.get("stck_bsop_date");
+						if(!outputObj.isEmpty()) {
+							InquireItemChart row10 = new InquireItemChart(jmCode, stck_bsop_date, chartData);
+							inquireChartRepository.save(row10);
+						}
+						// TODO:: 데이터 여부에 따라 처리 .
 //					else {
 //						InquireItemChart row10 = new InquireItemChart(jmCode, date1, output1);
 //						inquireChartRepository.save(row10);
 //					}
+					}
+					
 				}
 			} else {
 				InquireItemChart row10 = new InquireItemChart(jmCode, date1, output1);
@@ -264,44 +321,57 @@ public class DatabaseService {
 				response = null;
 			}
 		}
-		case TranFile.INQUIRE_DAILY_INDEX -> {
-			date1 = data.getObjCommInput().get("FID_INPUT_DATE_1");
-			date2 = data.getObjCommInput().get("FID_INPUT_DATE_2");
-			periodCode = data.getObjCommInput().get("FID_PERIOD_DIV_CODE");
-			pk_dailyIndex = new PK_dailyIndex(mrktType, jmCode, date1, date2, periodCode);
-
-			Optional<DailyIndex> dto6 = dailyIndexRepository.findById(pk_dailyIndex);
-			if (dto6.isPresent()) {
-				response.put("output1", CommonUtil.stringToMap(dto6.get().getOutput1()));
-				response.put("output2", CommonUtil.stringToList(dto6.get().getOutput2()));
-			} else {
-				response = null;
-			}
-
-		}
+//		case TranFile.INQUIRE_DAILY_INDEX -> {
+//			date1 = data.getObjCommInput().get("FID_INPUT_DATE_1");
+//			date2 = data.getObjCommInput().get("FID_INPUT_DATE_2");
+//			periodCode = data.getObjCommInput().get("FID_PERIOD_DIV_CODE");
+//			pk_dailyIndex = new PK_dailyIndex(mrktType, jmCode, date1, date2, periodCode);
+//
+//			Optional<DailyIndex> dto6 = dailyIndexRepository.findById(pk_dailyIndex);
+//			if (dto6.isPresent()) {
+//				response.put("output1", CommonUtil.stringToMap(dto6.get().getOutput1()));
+//				response.put("output2", CommonUtil.stringToList(dto6.get().getOutput2()));
+//			} else {
+//				response = null;
+//			}
+//
+//		}
 		case TranFile.INQUIRE_DAILY_ITEM -> {
 			date1 = data.getObjCommInput().get("FID_INPUT_DATE_1");
 			date2 = data.getObjCommInput().get("FID_INPUT_DATE_2");
 			periodCode = data.getObjCommInput().get("FID_PERIOD_DIV_CODE");
 			orgAdj = data.getObjCommInput().get("FID_ORG_ADJ_PRC");
 			
-			List<String> dateRange = getDateRange(date1, date2);
-			LOGCAT.i(TAG,  jmCode + " : [Date Range] - "+dateRange.toString() );
+//			List<String> dateRange = getDateRange(date1, date2);
+//			LOGCAT.i(TAG,  jmCode + " : [Date Range] - "+dateRange.toString() );
 			List<Object> output2 = new ArrayList<>();
 			if(periodCode.equals("D")) {
-				if(dateRange.size() < 200) {
-					for (String date3 : dateRange) {
-						pk_chart = new PK_chart(jmCode, date3);
-						Optional<InquireItemChart> dto = inquireChartRepository.findById(pk_chart);
-						try {
-							if(dto.isPresent()) {
-								output2.add(CommonUtil.objectToString(dto.get().getChartData()));
-							}
-						} catch (JsonProcessingException e) {
-							LOGCAT.i(TAG, "[ERROR] - " +e.toString());
+//				if(dateRange.size() < 200) {
+//					for (String date3 : dateRange) {
+//						pk_chart = new PK_chart(jmCode, date3);
+//						Optional<InquireItemChart> dto = inquireChartRepository.findById(pk_chart);
+//						try {
+//							if(dto.isPresent()) {
+//								output2.add(CommonUtil.objectToString(dto.get().getChartData()));
+//							}
+//						} catch (JsonProcessingException e) {
+//							LOGCAT.i(TAG, "[ERROR] - " +e.toString());
+//						}
+//					}
+//				}
+				List<InquireItemChart> dto = inquireChartRepository.selectChartData(jmCode,date1, date2);
+				try {
+					if(dto != null && dto.size() > 0) {
+						for(InquireItemChart chartData : dto) {
+								output2.add(CommonUtil.objectToString(chartData.getChartData()));
+							
 						}
 					}
+				} catch (JsonProcessingException e) {
+					LOGCAT.i(TAG, "[ERROR] - " +e.toString());
+					
 				}
+				
 				if (output2 == null || output2.isEmpty()) {
 					LOGCAT.i(TAG, "Output - 2 없음 ");
 					response = null;
@@ -315,6 +385,9 @@ public class DatabaseService {
 					}
 					response.put("output2", output2);
 				}
+				
+				
+				
 				
 			}else{
 				pk_dailyItem = new PK_dailyItem(mrktType, jmCode, date1, date2, periodCode, orgAdj);
@@ -351,6 +424,9 @@ public class DatabaseService {
 			if (dto9.isPresent()) {
 				response.put("output1", CommonUtil.stringToMap(dto9.get().getOutput1()));
 				response.put("output2", CommonUtil.stringToList(dto9.get().getOutput2()));
+				if( response.get("output2") == null || response.get("output1") == null ) {
+					response = null;
+				}
 			} else {
 				response = null;
 			}

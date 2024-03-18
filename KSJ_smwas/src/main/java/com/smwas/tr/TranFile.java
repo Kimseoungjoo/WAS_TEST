@@ -2,7 +2,10 @@ package com.smwas.tr;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.simple.JSONArray;
@@ -49,6 +52,9 @@ public class TranFile {
 	public static final String UPDATE = "update"; // UPDATE
 	public static final String DELETE = "delete"; // DELETE
 
+	// 	Exception handling
+	public static List<String> EXAPI = Arrays.asList(INQUIRE_ASK_PRICE_EXP);
+	
 	public TranFile() {
 		
 		// 데이터가 없을 경우에만 조회..
@@ -89,8 +95,12 @@ public class TranFile {
 
 	// URL 반환
 	public String getUrl(String url) {
-		LOGCAT.i(TAG, Boolean.toString(urlIdMap.containsKey(url))) ;
-		return urlIdMap.containsKey(url) ? url : null;
+		boolean urlFlag = false;
+		
+		for(Map.Entry<String,String> entry : urlIdMap.entrySet()) {
+			urlFlag = entry.getKey().contains(url);
+		}
+		return urlFlag ? url : null;
 	}
 
 	// 종목 유무

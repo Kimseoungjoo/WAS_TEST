@@ -18,9 +18,9 @@ import com.smwas.util.CommonUtil;
 @Service
 @Transactional(readOnly = true)
 public class RushTestService {
-	@Autowired
+//	@Autowired
 	private RealtimeCheRepository realtimeCheRepository;
-	@Autowired
+//	@Autowired
 	private RealtimeHoRepository realtimeHoRepository;
 
 	

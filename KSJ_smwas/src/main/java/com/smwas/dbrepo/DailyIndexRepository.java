@@ -7,7 +7,7 @@ import com.smwas.dbio.DailyIndex;
 import com.smwas.dbio.PK_dailyIndex;
 
 
-@Repository
+//@Repository
 public interface DailyIndexRepository extends JpaRepository<DailyIndex, PK_dailyIndex>{
 
 	

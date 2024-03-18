@@ -1,6 +1,3 @@
-
-
-
 package com.smwas.http;
 
 import java.io.IOException;
@@ -37,6 +34,7 @@ import com.smwas.monitoring.MonitoringService;
 import com.smwas.session.SessionItem;
 import com.smwas.session.SessionManager;
 import com.smwas.tr.TranFile;
+import com.smwas.util.CommonUtil;
 import com.smwas.util.LOGCAT;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -168,7 +166,6 @@ public class WasRestController {
 	 * @return
 	 * @throws IOException
 	 */
-
 	@PostMapping("/request")
 	public ResponseEntity<String> DbRequest(@RequestBody String sendData, HttpServletRequest request)
 			throws IOException {
@@ -183,7 +180,8 @@ public class WasRestController {
 			// Input 검증
 			Map<String, Object> inputCheckResult = CommApi.checkRequest(data);
 			boolean flag = (boolean) inputCheckResult.get("flag");
-			LOGCAT.i(TAG, "[REQUEST] [Data" + data.toString() + "]" + "\n" + sendData);
+			String url = CommonUtil.getUrlLastSegment(data.getTrCode());
+			LOGCAT.i(TAG, "[REQUEST] [Data " + data.toString() + "]" + "\n" + sendData);
 			if (flag) { // input 검증 완료
 				// DB 조회
 				ResultTrData dbResult = databaseService.selectDB(data);
@@ -193,7 +191,7 @@ public class WasRestController {
 				if (dbResult.getOutRecMap().get("msg_cd").equals("EGW00101")) {
 					// 한투 API 요청
 					ResultTrData apiResult = CommApi.getInstance().callApiForDB(data);
-					LOGCAT.i(TAG, apiResult.toString());
+					LOGCAT.i(TAG, "[REQUEST] - DATA : "+apiResult.toString());
 					String msg_cd = (String) apiResult.getOutRecMap().get("msg_cd");
 
 					// 요청 결과 DB 저장
@@ -285,14 +283,34 @@ public class WasRestController {
 		try {
 			ObjectMapper mapper = new ObjectMapper();
 			SendRealData wsData = mapper.readValue(sendWsData, SendRealData.class);
-			LOGCAT.i(TAG, wsData.toString());
-			if(wsData.getObjCommInput().get("tr_key") instanceof List) {
-				List<String> trKeyList = (List<String>) wsData.getObjCommInput().get("tr_key");
-				for (String key : trKeyList) {
-					ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,key);
+			LOGCAT.i(TAG, "[REQUEST REAL]"+wsData.toString());
+			if(wsData.getObjCommInput().get("tr_id").equals("H0STCNT0") 
+					|| wsData.getObjCommInput().get("tr_id").equals("H0STASP0")) {
+				
+				if(wsData.getObjCommInput().get("tr_key") instanceof List) {
+					List<String> trKeyList = (List<String>) wsData.getObjCommInput().get("tr_key");
+					for (String key : trKeyList) {
+						ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,key);
+						// data 여부 
+						if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
+							if (CommApi.getInstance().callRealAPI(wsData,key)) {
+								return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
+							} else {
+								LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
+								return ResponseEntity.status(400).body(sendWsData);
+							}
+						}else {
+							String result = mapper.writeValueAsString(checkMsg);
+							return ResponseEntity.status(400).body(result);
+						}
+					}
+					
+				}else if(wsData.getObjCommInput().get("tr_key") instanceof String) {
+					String trkey = (String) wsData.getObjCommInput().get("tr_key");
+					ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,trkey);
 					// data 여부 
 					if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
-						if (CommApi.getInstance().callRealAPI(wsData,key)) {
+						if (CommApi.getInstance().callRealAPI(wsData,trkey)) {
 							return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
 						} else {
 							LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
@@ -302,23 +320,11 @@ public class WasRestController {
 						String result = mapper.writeValueAsString(checkMsg);
 						return ResponseEntity.status(400).body(result);
 					}
-				}
-				
-			}else {
-				String trkey = (String) wsData.getObjCommInput().get("tr_key");
-				ResultTrData checkMsg = CommApi.getInstance().checkData(wsData,trkey);
-				// data 여부 
-				if(checkMsg.getOutRecMap().get("msg_cd").equals("MCA00000")) {
-					if (CommApi.getInstance().callRealAPI(wsData,trkey)) {
-						return ResponseEntity.status(HttpStatus.OK).body(sendWsData);
-					} else {
-						LOGCAT.i(TAG, "WAS - 한투 서버 연결 이상 / Data error [ " + sendWsData + " ]");
-						return ResponseEntity.status(400).body(sendWsData);
-					}
 				}else {
-					String result = mapper.writeValueAsString(checkMsg);
-					return ResponseEntity.status(400).body(result);
+					return ResponseEntity.status(400).body("input 값 형식을 확인해주세요 " );
 				}
+			}else {
+				return ResponseEntity.status(400).body("input [tr_id] 값 형식을 확인해주세요");
 			}
 			return null;
 		} catch (Exception e) {

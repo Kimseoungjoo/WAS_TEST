@@ -4,10 +4,12 @@
 
 let monitoringData = null;
 
-async function fetchMonitoringData() {
-    await fetch('http://203.109.30.207:10001/monitoring')
+function fetchMonitoringData() {
+    fetch('/monitoring')
         .then(response => response.json())
-        .then(response => monitoringData = response)
+        .then(response => {
+            monitoringData = response;
+        })
         .catch(error =>
             console.error('Error:', error),
             monitoringData = null       // 전역변수에 데이터 저장
@@ -21,17 +23,17 @@ drawMemoryChart();
 drawDiskChart();
 getSessionList();
 
+
+
+
 // 1초마다 모니터링 데이터 가져오기
 setInterval(fetchMonitoringData, 1000);
+
 
 /**
  * CPU 차트
  */
 async function drawCpuChart() {
-
-    while (!monitoringData) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100밀리초(0.1초) 대기
-    }
 
     const onChartLoad = function () {
         const chart = this,
@@ -39,7 +41,7 @@ async function drawCpuChart() {
 
         setInterval(async function () {
             const x = (new Date()).getTime(); // current time
-            const y = monitoringData.cpu * 100;     // 저장된 전역변수 값을 가져옴 
+            const y = monitoringData ? monitoringData.cpu * 100 : 0;     // 저장된 전역변수 값을 가져옴 
             series.addPoint([x, y], true, true);
             $('#cpuInfo').text(y.toFixed(2));
         }, 1000);
@@ -68,14 +70,17 @@ async function drawCpuChart() {
         time: {
             useUTC: false
         },
+        /* 차트명 */
         title: {
             text: ''
         },
+        /* X축 */
         xAxis: {
             type: 'datetime',
             tickPixelInterval: 150,
             maxPadding: 0.1
         },
+        /* Y축 */
         yAxis: {
             title: {
                 text: 'CPU (%)'
@@ -124,6 +129,7 @@ async function drawCpuChart() {
             {
                 name: 'CPU',
                 lineWidth: 2,
+                //color: Highcharts.getOptions().colors[2],
                 data
             }
         ],
@@ -140,10 +146,6 @@ async function drawCpuChart() {
  */
 async function drawMemoryChart() {
 
-    while (!monitoringData) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100밀리초(0.1초) 대기
-    }
-
     const onChartLoad = function () {
         const chart = this,
             series1 = chart.series[0], // Heap Memory
@@ -151,8 +153,8 @@ async function drawMemoryChart() {
 
         const updateData = async function () {
             const x = (new Date()).getTime(); // current time
-            const y1 = monitoringData.Heapsize;
-            const y2 = monitoringData.usedMemory;
+            const y1 = monitoringData ? monitoringData.Heapsize : 0;
+            const y2 = monitoringData ? monitoringData.usedMemory : 0;
 
             //addPoint(점, redraw.shift, animation)
             series1.addPoint([x, y1], true, true);
@@ -202,6 +204,8 @@ async function drawMemoryChart() {
             title: {
                 text: 'Memory (B)'
             },
+            // min: 0,
+            // max: 200
         },
         legend: {
             enabled: true
@@ -257,32 +261,29 @@ async function drawMemoryChart() {
  *  Disk 차트
  */
 async function drawDiskChart() {
-
-    while (!monitoringData) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100밀리초(0.1초) 대기
-    }
-
+    
     const fetchedData = async function () {
-        var using = monitoringData.usingDisk;
-        var usable = monitoringData.usableDisk;
-
+        var using = monitoringData ? monitoringData.usingDisk : 0;
+        var usable = monitoringData ? monitoringData.usableDisk : 0;
+        
         $('#usingDiskInfo').text(Number(using).toLocaleString());
         $('#usableDiskInfo').text(Number(usable).toLocaleString());
-
+        
         return [
             ['Using', using],
             ['Usable', usable]
         ];
     };
-
+    
+    
     const onChartLoad = function () {
         const chart = this,
             series = chart.series[0];
-
+        // 주기적으로 데이터 업데이트
         setInterval(async function () {
             const newData = await fetchedData();
             series.setData(newData);
-        }, 60000);  // 1분마다 호출
+        }, 1000); 
     };
 
     Highcharts.chart('diskChart', {
@@ -291,7 +292,7 @@ async function drawDiskChart() {
             plotBorderWidth: 0,
             plotShadow: false,
             events: {
-                load: onChartLoad
+                load: onChartLoad      // async 안됨
             }
         },
         title: {
@@ -321,7 +322,7 @@ async function drawDiskChart() {
             type: 'pie',
             innerSize: '50%',
             borderRadius: 5,
-            data: await fetchedData(),
+            data: fetchedData,        // async 안됨
             colors: [
                 Highcharts.getOptions().colors[0],
                 '#0ff3a0'
@@ -335,6 +336,8 @@ async function drawDiskChart() {
                 + '{point.y} MB'
         },
     });
+
+    
 }
 
 
@@ -342,61 +345,39 @@ async function drawDiskChart() {
  *  웹소켓 세션 리스트
  */
 async function getSessionList() {
-
-    while (!monitoringData) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100밀리초(0.1초) 대기
-    }
-    var sessionList = monitoringData.sessionList;
-    var tableBody = document.getElementById("sessionList");
-
-    // 초기화
-    while (tableBody.firstChild) {
-        tableBody.removeChild(tableBody.firstChild);
+    if (!monitoringData){
+        setTimeout(getSessionList, 500);
     }
 
-    for (var sessionItem in sessionList) {
-        // sessionItem = "0" 이렇게 키 값으로 나옴 -> Integer 로 형변환 해서 index로 사용
-        let itemNum = Number(sessionItem);
-        var row = document.createElement("tr"); // <tr> 요소 생성
+    // {connection: 1, ipList: Array(0)}
+    var sessionList = monitoringData ? monitoringData.sessionList : {connection: 0, ipList: []};
 
-        // <td> 에 각 데이터 추가
-        var statusCell = document.createElement("td");			// <td> 세션 사용 여부
-        statusCell.classList.add('status');
-        var websocketCell = document.createElement("td");	// <td> 세션 이용중인 웹소켓
-
-        var circle = document.createElement("div");         // 원형 div 생성
-        circle.classList.add("circle");
-        /* 
-            enable = true = usable = green
-                    false = using = blue
-        */
-        if (sessionList[itemNum].webSocketId === null) {
-            if (circle.classList.contains('using')) {
-                circle.classList.replace('using', 'usable');
-            }
-            if (!circle.classList.contains('usable')) {
-                circle.classList.add('usable');
-            }
-            websocketCell.textContent = "waiting...";
-        } else {
-            if (circle.classList.contains('usable')) {
-                circle.classList.replace('usable', 'using');
-            }
-            if (!circle.classList.contains('using')) {
-                circle.classList.add('using');
-            }
-            websocketCell.textContent = sessionList[itemNum].webSocketId;
+    let status = document.getElementById("status");
+    let ipAddress = document.getElementById("ipAddress");
+    
+    if (sessionList.connection == 0) {
+        ipAddress.innerText = "session is not connected";
+        if (status.classList.contains('using')) {
+            status.classList.replace('using', 'usable');
         }
-        statusCell.appendChild(circle); // 원형 div를 td에 추가
-
-        // <tr> 요소에 <td> 요소 추가
-        row.appendChild(statusCell);
-        row.appendChild(websocketCell);
-
-        // <tr> 요소를 테이블에 추가
-        tableBody.appendChild(row);
+    } else {
+        if (sessionList.ipList[0] == null) {
+            ipAddress.innerText = "waiting...";
+        } else {
+	        let ipListString = "";
+	        for (let ip of sessionList.ipList) {
+				ipListString += ip + "<br/>";
+	        }
+	        ipAddress.innerHTML = ipListString;
+	        
+	        if (status.classList.contains('usable')) {
+	            status.classList.replace('usable', 'using');
+	        }
+			
+		}
     }
 
     setTimeout(getSessionList, 1000) // 1초 후 재실행
+
 
 }
